@@ -51,12 +51,12 @@
     <!-- ✅ FOOTER -->
     <div id="footer">
     <hr>
-      Speechdeb Editor <span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} The Speechdeb Team •
+      Speechdeb Editor <span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
       <a href="contact.html">Contact Support</a> •
       <a href="https://speechdeb.infy.uk/blog/blog.php">Blog</a>
       <hr>
       <p>
-        The Speechdeb Team is not affiliated with the <a href="https://mmssl.weebly.com">MMSSL</a>,
+        Speechdeb Software is not affiliated with, or endorsed by, the <a href="https://mmssl.weebly.com">MMSSL</a>,
         the <a href="https://msdlonline.org">MSDL</a>, the <a href="https://bostondebate.org">BDL</a>, the <a href="https://speechanddebate.org">NSDA</a>, or any such organization.
       </p>
     </div>
