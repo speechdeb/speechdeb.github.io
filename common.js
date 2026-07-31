@@ -5,11 +5,11 @@
     <!-- ✅ VERSION BANNER -->
     <div id="versionBannerMenu">
       <div id="menuHeading">
-        <a style="color: white;" href="https://speechdeb.infy.uk/index.php">Speechdeb Editor <span id="menuVersion"></span></a>
+        <a style="color: white;" href="https://speechdeb.infy.uk/index.html">Speechdeb Editor <span id="menuVersion"></span></a>
       </div>
       <br>
       <div id="subtitle">
-        <a style="color: #bbbbbb;" href="https://speechdeb.infy.uk/index.php">The first text editor for the National Speech & Debate Association!</a>
+        <a style="color: #bbbbbb;" href="https://speechdeb.infy.uk/index.html">The first text editor for the National Speech & Debate Association!</a>
       </div>
     </div>
 
