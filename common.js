@@ -53,7 +53,8 @@
     <hr>
       Speechdeb Editor <span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
       <a href="contact.html">Contact Support</a> •
-      <a href="https://speechdeb.infy.uk/blog/blog.php">Blog</a>
+      <a href="blog/blog.php">Blog</a> •
+      <a href="https://linkedin.com/company/speechdeb">LinkedIn</a>
       <hr>
       <p>
         Speechdeb Software is not affiliated with, or endorsed by, the <a href="https://mmssl.weebly.com">MMSSL</a>,
