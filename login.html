@@ -81,7 +81,7 @@
             localStorage.setItem("speechdeb_loggedin", "true");
             localStorage.setItem("speechdeb_email", email);
             localStorage.removeItem("speechdeb_guest"); // no longer a guest
-            window.location.href = "index.php";
+            window.location.href = "index.html";
           }
         });
       }
@@ -97,8 +97,8 @@
           localStorage.removeItem("speechdeb_email");
           localStorage.removeItem("speechdeb_loggedin");
 
-          // Go through index.php in guest mode
-          window.location.href = "index.php?guest=1";
+          // Go through index.html in guest mode
+          window.location.href = "index.html?guest=1";
         });
       }
 
