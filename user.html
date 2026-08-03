@@ -282,6 +282,120 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  async function loadSpeechesFromServer(profileId, isOwner) {
+  const { data: speeches, error } = await supabaseClient
+    .from("speeches")
+    .select("*")
+    .eq("user_id", profileId)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    console.error("Failed to load speeches:", error);
+    document.getElementById("menuView").innerHTML =
+      `<p>Failed to load speeches.</p><pre>${error.message}</pre>`;
+    return;
+  }
+
+  // Build the same speechBox elements guest mode uses, so filtering/sorting
+  // (updateSpeechDisplay/initializeFilters) works identically for both modes.
+  const menu = document.getElementById("menuView");
+  menu.innerHTML = "";
+  originalSpeechBoxes = [];
+
+  if (isOwner) {
+    // Reuse the same "New Speech" button guest mode uses
+    ensureGuestNewSpeechButton
+      ? null
+      : null; // (no-op — button creation below is done inline instead)
+
+    let btn = document.getElementById("newSpeechBtn");
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.id = "newSpeechBtn";
+      btn.textContent = "New Speech";
+      btn.className = "primaryButton";
+      btn.style.display = "block";
+      btn.style.margin = "0 auto 15px auto";
+      btn.style.textAlign = "center";
+      btn.onclick = () => {
+        window.location.href = "editor.html?new=1";
+      };
+      menu.parentNode.insertBefore(btn, menu);
+    }
+  }
+
+  if (!speeches.length) {
+    const emptyMsg = document.createElement("div");
+    emptyMsg.textContent = isOwner
+      ? "No speeches yet. Click “New Speech” to get started."
+      : "This user hasn't shared any speeches yet.";
+    emptyMsg.style = "margin-top: 20px; font-size: 20px; color: #666; text-align: center;";
+    menu.appendChild(emptyMsg);
+    return;
+  }
+
+  speeches.forEach(s => {
+    const box = document.createElement("div");
+    box.className = "speechBox";
+
+    const lastUpdated = s.updated_at || s.created_at;
+    const category = s.category || "Uncategorized";
+    const title = s.title || "Untitled Speech";
+
+    box.setAttribute("data-category", category);
+    box.setAttribute("data-title", title);
+    box.setAttribute("data-updated", lastUpdated);
+    box.style = `background-color: #f9f9f9; border: 1px solid #ccc; border-radius: 10px; padding: 14px 20px; margin: 10px auto; max-width: 70%; cursor: pointer;`;
+
+    const relative = (typeof formatRelativeTime === "function")
+      ? formatRelativeTime(lastUpdated)
+      : new Date(lastUpdated).toLocaleString();
+
+    const deleteButtonHtml = isOwner
+      ? `<button class="deleteBtn" style="margin-left: 20px; background-color: #cc0000; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Delete</button>`
+      : "";
+
+    box.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-weight: bold; font-size: 18px;">[${category}] ${title}</div>
+          <div style="color: #666; font-size: 14px;">Last edited ${relative}</div>
+        </div>
+        ${deleteButtonHtml}
+      </div>`;
+
+    if (isOwner) {
+      const deleteBtn = box.querySelector(".deleteBtn");
+      if (deleteBtn) {
+        deleteBtn.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm(`Delete your ${category} speech "${title}"? This cannot be undone.`)) return;
+
+          const { error: deleteError } = await supabaseClient
+            .from("speeches")
+            .delete()
+            .eq("id", s.id);
+
+          if (deleteError) {
+            alert(deleteError.message || "Delete failed.");
+          } else {
+            loadSpeechesFromServer(profileId, isOwner);
+          }
+        };
+      }
+    }
+
+    box.onclick = () => {
+      window.location.href = `editor.html?id=${s.id}`;
+    };
+
+    originalSpeechBoxes.push(box);
+  });
+
+  initializeFilters(speeches);
+  updateSpeechDisplay();
+}
+
   // 🔹 GUEST MODE
   if (isGuest) {
     if (pic) { pic.src = "favicon.png"; pic.style.cursor = "default"; }
