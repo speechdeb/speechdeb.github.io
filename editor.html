@@ -1,4 +1,3 @@
- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,14 +30,6 @@
 </div>
 <!-- NEW: Separate row for formatting and memorization controls -->
 <div id="editorModeControls" style="display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 20px 0;">
-  <div id="formatControls" style="display: flex; gap: 10px; padding: 10px 20px; background: #f0f0f0; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
-    <button title="Bold" onclick="document.execCommand('bold')"><b>B</b></button>
-    <button title="Italic" onclick="document.execCommand('italic')"><i>I</i></button>
-    <button title="Underline" onclick="document.execCommand('underline')"><u>U</u></button>
-    <button title="Indent" onclick="document.execCommand('indent')">◀️</button>
-    <button title="Outdent" onclick="document.execCommand('outdent')">▶️</button>
-  </div>
-
   <div id="memNav" style="display: none; padding: 10px 20px; background: #fff8dc; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
     <div class="editorRow" style="display: flex; gap: 10px; align-items: center;">
       <button id="prevSentenceBtn">⬅️</button>
@@ -53,7 +44,12 @@
   </div>
 </div>
 </div>
-        <div id="textBox" contenteditable="true" data-tour="step4" ></div>
+        <div style="position: relative;">
+          <div id="textBox" contenteditable="true" data-tour="step4" ></div>
+          <div style="position: absolute; bottom: 8px; right: 12px; font-size: 14px; color: #888; background: rgba(255,255,255,0.85); padding: 2px 8px; border-radius: 6px;">
+            <span id="wordCount">0</span> words
+          </div>
+        </div>
         <div id="downloadUploadWrapper">
         <div >
             <button>Download .txt</button>
@@ -62,13 +58,10 @@
         </div>
         </div>
 
-
-
         <!-- Separate Last Saved aligned right -->
         <div id="unsavedWarning">
         </div>
 
-        <!-- ✅ TIMER BOX REPLACEMENT -->
         <!-- ✅ TIMER BOX -->
         <div id="timerBox" class="small">
         <div id="timerContentMini">
@@ -79,12 +72,10 @@
 
         <div id="timerContentFull" >
             <div id="timerDisplay" >07:30.0</div>
-            <!-- Collapse button top left -->
         <div >
         <button id="collapseBtn" >⇱</button>
         </div>
 
-        <!-- Centered Start/Stop below timer -->
         <div >
         <button onclick="startTimer()">▶️ Start</button>
         <button onclick="stopTimer()">⏹️ Stop</button>
@@ -99,38 +90,23 @@
         </div>
         <!-- ✅ END TIMER BOX -->
 <br><br>
-<div id="statsBox" class="dialCluster">
-  <div class="speedoBox">
-    <div class="speedoLabel">WPM</div>
-    <div class="dialOuter">
-      <div id="wpmNeedle" class="needle"></div>
-      <div class="dialCenter">0</div>
-    </div>
-  </div>
-
-  <div class="odometerBox">
-    <div class="odoLabel">Word Count</div>
-    <div id="odometer" class="odometer">0000</div>
-  </div>
-
-  <div class="speedoBox">
-    <div class="speedoLabel">Pace</div>
-    <div class="dialOuter">
-      <div id="spwNeedle" class="needle"></div>
-      <div class="dialCenter">–</div>
-    </div>
-  </div>
-</div>
         <br></br><br>
         <div>
       </div>
+<!-- NOTE: the standalone saveSpeech({...}) function that used to live here
+     was removed. script.js now has its own saveSpeech() (no args, reads
+     the DOM directly) that's actually wired to the autosave triggers -
+     the version that lived in this file was dead/unused and had a
+     different, incompatible signature. -->
 <script src="common.js" defer></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  // 🔹 Detect guest mode (same logic as common.js)
   const urlParams    = new URLSearchParams(window.location.search);
   const guestFromUrl = urlParams.get("guest") === "1";
   const guestMode    = guestFromUrl || localStorage.getItem("speechdeb_guest") === "1";
 
+  // 🔹 In guest mode, hide the share status + Copy Link controls
   if (guestMode) {
     const shareWrapper = document.getElementById("shareWrapper");
     if (shareWrapper) {
@@ -141,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function tryLoadEditor() {
     const payload = localStorage.getItem("speechdeb_editor_payload");
 
-    if (!payload) {
+    if (!payload || typeof initScript !== "function") {
       setTimeout(tryLoadEditor, 100);
       return;
     }
@@ -155,9 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    if (typeof initScript === "function") {
-      initScript();
-    }
+    initScript();
   }
 
   tryLoadEditor();
