@@ -1,0 +1,50 @@
+---
+layout: none
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Speechdeb Blog</title>
+  <link rel="stylesheet" href="../styles.css" />
+  <script type="module" src="../common.js"></script>
+  <style>
+    #supportPopup {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <main style="display: flex; justify-content: center; align-items: flex-start;">
+    <div id="supportPopup"
+         style="width: 50%; height: auto; padding: 30px; border: 1px solid #ccc;
+                border-radius: 10px; background-color: #fdfdfd; margin-top: 20px;">
+
+      <div class="headingContainer"
+           style="display: flex; flex-direction: column; align-items: flex-start;">
+        <h1 style="margin: 0;">Speechdeb Blog</h1>
+      </div>
+
+      <hr />
+      <p>
+        Welcome to the official blog of The Speechdeb Team! We regularly post updates here
+        about new features we plan to add (or may have already added)! Stay tuned for more info,
+        and be sure to look at our recent posts below.
+      </p>
+      <br>
+
+      {% if site.posts.size > 0 %}
+        {% assign latest = site.posts.first %}
+        <section>
+          <h2>{{ latest.date | date: "%-d %B %Y" }}</h2>
+          <hr>
+          <a href="{{ latest.url | relative_url }}">{{ latest.title }}</a>
+        </section>
+      {% else %}
+        <p><em>No posts found yet. Once a new post is written, it'll appear here.</em></p>
+      {% endif %}
+
+    </div>
+  </main>
+</body>
+</html>
