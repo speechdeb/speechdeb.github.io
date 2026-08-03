@@ -124,57 +124,6 @@
         <br></br><br>
         <div>
       </div>
-<script>
-  const SUPABASE_URL = "https://tdaykujyicpvokrkryea.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_m_eAW0KQTU_GYz0KhsLIbw_ltdhysCv";
-  const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  async function saveSpeech({
-    id = null,
-    title,
-    content,
-    category,
-    memorization_mode = false,
-    done_sentences = [],
-    share_status = "private"
-  }) {
-    if (!title || !content || !category) {
-      return { error: "⚠️ Missing required fields." };
-    }
-
-    const { data: sessionData } = await supabaseClient.auth.getSession();
-    const currentUser = sessionData?.session?.user;
-
-    if (!currentUser) {
-      return { error: "❌ You must be logged in to save a speech." };
-    }
-
-    const payload = {
-      user_id: currentUser.id,
-      title, content, category, memorization_mode, done_sentences, share_status,
-      updated_at: new Date().toISOString()
-    };
-
-    let result;
-    if (id) {
-      result = await supabaseClient.from("speeches").update(payload)
-        .eq("id", id).eq("user_id", currentUser.id).select().single();
-    } else {
-      result = await supabaseClient.from("speeches")
-        .insert({ ...payload, created_at: new Date().toISOString() })
-        .select().single();
-    }
-
-    const { data, error } = result;
-    if (error) {
-      if (error.message.includes("duplicate key")) {
-        return { error: `❌ You already have a speech titled "${title}". Try renaming it.` };
-      }
-      return { error: "❌ Save failed: " + error.message };
-    }
-    return { success: true, id: data.id };
-  }
-</script>
 <script src="common.js" defer></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
