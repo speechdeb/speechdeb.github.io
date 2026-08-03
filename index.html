@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <title>Redirecting...</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
+    const SUPABASE_URL = "https://tdaykujyicpvokrkryea.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_m_eAW0KQTU_GYz0KhsLIbw_ltdhysCv";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    document.addEventListener("DOMContentLoaded", async () => {
       const params = new URLSearchParams(window.location.search);
       const guestFromUrl = params.get("guest") === "1";
 
       let guestFromStorage = false;
-      let email = null;
-
       try {
         guestFromStorage = localStorage.getItem("speechdeb_guest") === "1";
-        email = localStorage.getItem("speechdeb_email");
       } catch (e) {
         // localStorage might not be available (very rare), just ignore
       }
@@ -29,21 +31,15 @@
         return;
       }
 
-      // 2) Normal auto-login via stored email
-      if (email) {
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.style.display = "none";
+      // 2) Real Supabase session check (replaces the old broken form-POST
+      // auto-login, which had nowhere to submit to once PHP was gone)
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      const currentUser = sessionData?.session?.user;
 
-        const input = document.createElement("input");
-        input.name = "email";
-        input.value = email;
-        form.appendChild(input);
-
-        document.body.appendChild(form);
-        form.submit();
+      if (currentUser) {
+        window.location.href = "user.html";
       } else {
-        // 3) No email + not guest -> go to login screen
+        // 3) No active session + not guest -> go to login screen
         window.location.href = "login.html";
       }
     });
