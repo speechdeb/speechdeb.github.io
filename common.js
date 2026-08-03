@@ -1,4 +1,60 @@
-const APP_VERSION = "v2.12";
+// === Maintenance mode overlay ===
+// NOT real security — this is a client-side JS file in a public repo, so
+// the password is trivially visible to anyone who views source or opens
+// dev tools. This only deters casual visitors, nothing more.
+(function () {
+  const STAFF_PASSWORD = "Speechdeb";
+  const UNLOCK_KEY = "speechdeb_maintenance_unlocked";
+
+  if (localStorage.getItem(UNLOCK_KEY) === "true") return;
+
+  function showMaintenanceOverlay() {
+    const overlay = document.createElement("div");
+    overlay.id = "maintenanceOverlay";
+    overlay.style.cssText = `
+      position: fixed; top:0; left:0; width:100vw; height:100vh;
+      background:#ffffff; z-index:999999;
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      font-family:sans-serif; text-align:center; padding:20px; box-sizing:border-box;
+    `;
+    overlay.innerHTML = `
+      <h1 style="font-size:28px; margin-bottom:10px;">This site is currently under maintenance</h1>
+      <p style="color:#666; margin-bottom:20px;">Please check back soon.</p>
+      <input type="password" id="staffPasswordInput" placeholder="Staff password"
+             style="padding:8px 12px; font-size:16px; border:1px solid #ccc; border-radius:6px; margin-bottom:10px; width:220px;" />
+      <br>
+      <button id="staffPasswordSubmit" style="padding:8px 16px; font-size:16px; border-radius:6px; border:none; background:#007acc; color:white; cursor:pointer;">Enter</button>
+      <p id="staffPasswordError" style="color:#c00; margin-top:10px; height:16px;"></p>
+    `;
+    document.body.appendChild(overlay);
+
+    const input = document.getElementById("staffPasswordInput");
+    const btn = document.getElementById("staffPasswordSubmit");
+    const errorEl = document.getElementById("staffPasswordError");
+
+    function tryUnlock() {
+      if (input.value === STAFF_PASSWORD) {
+        localStorage.setItem(UNLOCK_KEY, "true");
+        overlay.remove();
+      } else {
+        errorEl.textContent = "Incorrect password.";
+      }
+    }
+
+    btn.addEventListener("click", tryUnlock);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") tryUnlock();
+    });
+  }
+
+  if (document.body) {
+    showMaintenanceOverlay();
+  } else {
+    document.addEventListener("DOMContentLoaded", showMaintenanceOverlay);
+  }
+})();
+
+const APP_VERSION = "v1.02";
   const CURRENT_YEAR = new Date().getFullYear();
 
   // 🔹 Supabase setup — shared across every page that loads common.js.
@@ -31,11 +87,11 @@ const APP_VERSION = "v2.12";
     <!-- ✅ VERSION BANNER -->
     <div id="versionBannerMenu">
       <div id="menuHeading">
-        <a style="color: white;" href="/">Speechdeb Editor <span id="menuVersion"></span></a>
+        <a style="color: white;" href="https://speechdeb.infy.uk/index.html">Speechdeb Editor <span id="menuVersion"></span></a>
       </div>
       <br>
       <div id="subtitle">
-        <a style="color: #bbbbbb;" href="/">The first text editor for the National Speech & Debate Association!</a>
+        <a style="color: #bbbbbb;" href="https://speechdeb.infy.uk/index.html">The first text editor for the National Speech & Debate Association!</a>
       </div>
     </div>
 
@@ -77,9 +133,9 @@ const APP_VERSION = "v2.12";
     <!-- ✅ FOOTER -->
     <div id="footer">
     <hr>
-      Speechdeb Editor v0.1-<span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
+      Speechdeb Editor <span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
       <a href="contact.html">Contact Support</a> •
-      <a href="blog/blog.html">Blog</a> •
+      <a href="blog/blog.php">Blog</a> •
       <a href="https://linkedin.com/company/speechdeb">LinkedIn</a>
       <hr>
       <p>
@@ -198,8 +254,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   // These are fine for both guest + logged-in
-  if (prefs)   prefs.onclick   = () => window.location.href = "settings.html";
-  if (support) support.onclick = () => window.location.href = "contact.html";
+  if (prefs)   prefs.onclick   = () => window.location.href = "https://speechdeb.infy.uk/settings.html";
+  if (support) support.onclick = () => window.location.href = "http://speechdeb.infy.uk/contact.html";
 
   // 🔹 Logout: real Supabase signOut + clear local guest flags
   async function logout() {
