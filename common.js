@@ -1,5 +1,31 @@
-  const APP_VERSION = "v1.02";
+const APP_VERSION = "v1.02";
   const CURRENT_YEAR = new Date().getFullYear();
+
+  // 🔹 Supabase setup — shared across every page that loads common.js.
+  // If a page already defined its own supabaseClient (like user.html does),
+  // this reuses it instead of creating a duplicate.
+  function ensureSupabaseClient() {
+    return new Promise((resolve) => {
+      if (window.supabaseClient) {
+        resolve(window.supabaseClient);
+        return;
+      }
+      function createClientOnceLoaded() {
+        const SUPABASE_URL = "https://tdaykujyicpvokrkryea.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_m_eAW0KQTU_GYz0KhsLIbw_ltdhysCv";
+        window.supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        resolve(window.supabaseClient);
+      }
+      if (window.supabase) {
+        createClientOnceLoaded();
+      } else {
+        const cdnScript = document.createElement("script");
+        cdnScript.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+        cdnScript.onload = createClientOnceLoaded;
+        document.head.appendChild(cdnScript);
+      }
+    });
+  }
 
   const html = `
     <!-- ✅ VERSION BANNER -->
@@ -64,8 +90,7 @@
   `;
 
   // Wait for DOM to load then inject components
-// Wait for DOM to load then inject components
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
   const wrapper = document.createElement("div");
   wrapper.innerHTML = html;
 
@@ -91,13 +116,17 @@ window.addEventListener("DOMContentLoaded", () => {
   const guestFromUrl = urlParams.get("guest") === "1";
 
   if (guestFromUrl) {
-    // Sticky guest mode once you've entered via ?guest=1
     localStorage.setItem("speechdeb_guest", "1");
   }
 
-  const loggedIn  = localStorage.getItem("speechdeb_loggedin");
-  const email     = localStorage.getItem("speechdeb_email");
   const guestMode = guestFromUrl || localStorage.getItem("speechdeb_guest") === "1";
+
+  // 🔹 Make sure Supabase is ready before checking session
+  const supabaseClient = await ensureSupabaseClient();
+
+  // 🔹 Real Supabase session check (replaces the old loggedIn/email flags)
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const currentUser = sessionData?.session?.user || null;
 
   // 🔹 USER PANEL: Guest first, then logged-in user
   const userPanelEl   = document.getElementById("userPanel");
@@ -105,7 +134,6 @@ window.addEventListener("DOMContentLoaded", () => {
   const avatarImg     = document.getElementById("userAvatarDisplay");
 
   if (guestMode) {
-    // ✅ Guest navbar: default pic + "Guest"
     if (userPanelEl && emailDisplay) {
       userPanelEl.style.display = "block";
       emailDisplay.textContent  = "Guest";
@@ -113,35 +141,28 @@ window.addEventListener("DOMContentLoaded", () => {
     if (avatarImg) {
       avatarImg.src = "favicon.png";
     }
-  } else if (loggedIn === "true" && email) {
-    // ✅ Normal logged-in user navbar
-    fetch("user.php?action=get&email=" + encodeURIComponent(email))
-      .then(res => res.json())
-      .then(data => {
-        const nameToShow = data.name || email; // fallback to email
-        if (userPanelEl && emailDisplay) {
-          userPanelEl.style.display = "block";
-          emailDisplay.textContent  = nameToShow;
-        }
+  } else if (currentUser) {
+    const { data: profile, error } = await supabaseClient
+      .from("profiles")
+      .select("*")
+      .eq("id", currentUser.id)
+      .single();
 
-        if (avatarImg) {
-          const src = data.profile_picture_url 
-            ? (data.profile_picture_url.startsWith("http")
-                ? data.profile_picture_url
-                : location.origin + "/" + data.profile_picture_url)
-            : "favicon.png";
-          avatarImg.src = src + "?t=" + Date.now(); // 🧼 cache-bust
-        }
-      })
-      .catch(err => {
-        console.error("❌ Failed to fetch user profile:", err);
-        if (userPanelEl && emailDisplay) {
-          userPanelEl.style.display = "block";
-          emailDisplay.textContent  = email; // fallback if fetch fails
-        }
-      });
+    const nameToShow = (profile && profile.name) || currentUser.email;
+    if (userPanelEl && emailDisplay) {
+      userPanelEl.style.display = "block";
+      emailDisplay.textContent  = nameToShow;
+    }
+
+    if (avatarImg) {
+      const src = (profile && profile.profile_picture_url) || "favicon.png";
+      avatarImg.src = src + (src.includes("?") ? "&" : "?") + "t=" + Date.now();
+    }
+
+    if (error) {
+      console.error("❌ Failed to fetch user profile:", error);
+    }
   } else {
-    // ❌ Not guest and not logged in → navbar stays hidden
     if (userPanelEl) {
       userPanelEl.style.display = "none";
     }
@@ -154,12 +175,10 @@ window.addEventListener("DOMContentLoaded", () => {
   const support    = document.getElementById("support");
   const logoutBtn  = document.getElementById("logout");
 
-  // 🔹 Guest mode: hide Reset Password & Delete Account
   if (guestMode) {
     if (reset) reset.style.display = "none";
     if (del)   del.style.display   = "none";
-  } else if (loggedIn === "true" && email) {
-    // 🔹 Logged-in: wire up reset + delete
+  } else if (currentUser) {
     if (reset) {
       reset.onclick = () => window.location.href = "reset.html";
     }
@@ -172,16 +191,14 @@ window.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // These are fine for both guest + logged-in
   if (prefs)   prefs.onclick   = () => window.location.href = "https://speechdeb.infy.uk/settings.html";
   if (support) support.onclick = () => window.location.href = "http://speechdeb.infy.uk/contact.html";
 
-  // 🔹 Logout clears guest + login flags and ALWAYS goes to login screen
-  function logout() {
-    localStorage.removeItem("speechdeb_loggedin");
-    localStorage.removeItem("speechdeb_email");
+  // 🔹 Logout: real Supabase signOut + clear local guest flags
+  async function logout() {
+    await supabaseClient.auth.signOut();
     localStorage.removeItem("speechdeb_guest");
-    window.location.href = "login.php";  // ⬅️ important change
+    window.location.href = "login.html";
   }
   window.logout = logout;
   if (logoutBtn) logoutBtn.onclick = logout;
@@ -199,7 +216,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ✅ Make toggleUserMenu accessible globally
   window.toggleUserMenu = () => {
     const menu  = document.getElementById("userMenuItems");
     const arrow = document.getElementById("userDropdownArrow");
@@ -251,9 +267,7 @@ window.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("resize", checkScreenSize);
 });
 
-// ✅ Make it accessible to inline HTML
-
-  // Inject styles.css if not already present
+// Inject styles.css if not already present
   if (!document.querySelector('link[href="styles.css"]')) {
     const styleLink = document.createElement("link");
     styleLink.rel = "stylesheet";
@@ -278,15 +292,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const path = window.location.pathname;
 
   const isNonEditorPage =
-    path.includes("login.php")   ||
-    path.includes("signup.php")  ||
+    path.includes("login.html")   ||
+    path.includes("signup.html")  ||
     path.includes("reset.html")  ||
     path.includes("contact.html") ||
     path.includes("/blog/") ||
     path.includes("404.html");
 
   if (isNonEditorPage) {
-    // These pages use their own inline JS
     return;
   }
 
