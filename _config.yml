@@ -1,0 +1,7 @@
+title: Speechdeb Blog
+permalink: /blog/:year/:month/:day/:title.html
+
+# Jekyll only processes files with front matter (--- at the top) as templates.
+# Every other file in the repo (index.html, login.html, script.js, etc.)
+# gets copied through untouched — this is safe to add alongside the rest
+# of your static site.
