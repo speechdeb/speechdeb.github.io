@@ -1,4 +1,4 @@
-<!-- === GET: Show login page === -->
+<!-- === Login page (converted, wired to Supabase) === -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,6 +6,12 @@
   <title>Login</title>
   <link rel="stylesheet" href="styles.css" />
   <script type="module" src="common.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = "https://tdaykujyicpvokrkryea.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_m_eAW0KQTU_GYz0KhsLIbw_ltdhysCv";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
 </head>
 <body>
   <main>
@@ -15,12 +21,10 @@
         <input type="email" id="loginEmail" placeholder="Email" required />
         <input type="password" id="loginPassword" placeholder="Password" required />
         <button type="submit">Login</button>
-        <p id="loginError" style="color:#c00; margin-top:8px;">
-          <?php if (!empty($loginError)) echo htmlspecialchars($loginError); ?>
-        </p>
+        <p id="loginError" style="color:#c00; margin-top:8px;"></p>
         <p><a href="reset.html">Forgot Password?</a></p>
       </form>
-      <p>Don't have an account? <a href="signup.php">Sign up</a></p>
+      <p>Don't have an account? <a href="signup.html">Sign up</a></p>
       <div style="margin-top:8px; text-align:center;">
         <a href="#" id="stayLoggedOutBtn" style="color: #007ACC;">
           Stay logged out
@@ -47,63 +51,11 @@
           const email = document.getElementById("loginEmail").value.trim();
           const password = document.getElementById("loginPassword").value.trim();
 
-          let res;
-          try {
-            res = await fetch("login.php", {
-              method: "POST",
-              headers: { "Content-Type": "application/x-www-form-urlencoded" },
-              credentials: "include",
-              body: `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
-            });
-          } catch (err) {
+          const { data, error } = await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+          if (error) {
             if (loginErrorEl) {
-              loginErrorEl.textContent = "Network error. Please check your connection and try again.";
-            }
-            return;
-          }
-
-          if (!res.ok) {
-            let msg = "Something went wrong. Please try again.";
-            try {
-              const err = await res.json();
-              if (err && err.error) msg = err.error;
-            } catch (e) {
-              // If response isn't valid JSON, we still show a generic message
-            }
-
-            if (loginErrorEl) {
-              loginErrorEl.textContent = msg;
-              loginErrorEl.style.display = "block";
-              loginErrorEl.style.color = "#c00";
-            }
-          } else {
-            // ✅ Normal logged-in flow
-            localStorage.setItem("speechdeb_loggedin", "true");
-            localStorage.setItem("speechdeb_email", email);
-            localStorage.removeItem("speechdeb_guest"); // no longer a guest
-            window.location.href = "index.html";
-          }
-        });
-      }
-
-      // ✅ Guest / "Stay logged out" mode
-      const stayBtn = document.getElementById("stayLoggedOutBtn");
-      if (stayBtn) {
-        stayBtn.addEventListener("click", function (e) {
-          e.preventDefault(); // it's a link
-
-          // Guest mode: keep speeches local only
-          localStorage.setItem("speechdeb_guest", "1");
-          localStorage.removeItem("speechdeb_email");
-          localStorage.removeItem("speechdeb_loggedin");
-
-          // Go through index.html in guest mode
-          window.location.href = "index.html?guest=1";
-        });
-      }
-
-      // ℹ️ tooltip works via title="" attribute; no JS needed here
-    });
-  </script>
-</body>
-</html>
+              loginErrorEl.textContent =
