@@ -31,11 +31,11 @@ const APP_VERSION = "v2.12";
     <!-- ✅ VERSION BANNER -->
     <div id="versionBannerMenu">
       <div id="menuHeading">
-        <a style="color: white;" href="index.html">Speechdeb Editor <span id="menuVersion"></span></a>
+        <a style="color: white;" href="/">Speechdeb Editor <span id="menuVersion"></span></a>
       </div>
       <br>
       <div id="subtitle">
-        <a style="color: #bbbbbb;" href="index.html">The first text editor for the National Speech & Debate Association!</a>
+        <a style="color: #bbbbbb;" href="/">The first text editor for the National Speech & Debate Association!</a>
       </div>
     </div>
 
@@ -79,7 +79,7 @@ const APP_VERSION = "v2.12";
     <hr>
       Speechdeb Editor v0.1-<span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
       <a href="contact.html">Contact Support</a> •
-      <a href="blog/blog.php">Blog</a> •
+      <a href="blog/blog.html">Blog</a> •
       <a href="https://linkedin.com/company/speechdeb">LinkedIn</a>
       <hr>
       <p>
