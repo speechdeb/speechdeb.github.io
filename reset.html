@@ -5,24 +5,97 @@
   <title>Password Reset</title>
   <link rel="stylesheet" href="./styles.css" />
   <script type="module" src="common.js"></script>
-  <script src="script.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = "https://tdaykujyicpvokrkryea.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_m_eAW0KQTU_GYz0KhsLIbw_ltdhysCv";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  </script>
 </head>
 <body>
   <main>
     <div id="authBox" class="authContainer">
       <h2>Password Reset</h2>
-      <form id="passwordResetForm" onsubmit="return handlePasswordReset(event)">
+
+      <!-- Step 1: request a reset link (shown by default) -->
+      <form id="requestResetForm">
         <input type="email" id="resetEmail" placeholder="Enter your email" required />
-        <button type="button" onclick="sendResetCode()">Send Code</button>
-        <div id="verificationSection">
-          <input type="text" id="verificationCode" placeholder="Enter verification code" required />
-          <input type="password" id="newPassword" placeholder="Enter new password" required />
-          <button type="submit">Reset Password</button>
-          <p id="resetError"></p>
-        </div>
+        <button type="submit">Send Reset Link</button>
+        <p id="requestMessage"></p>
       </form>
+
+      <!-- Step 2: set a new password (only shown after clicking the emailed link) -->
+      <form id="setNewPasswordForm" style="display: none;">
+        <input type="password" id="newPassword" placeholder="Enter new password" required minlength="6" />
+        <input type="password" id="newPasswordConfirm" placeholder="Confirm new password" required minlength="6" />
+        <button type="submit">Reset Password</button>
+        <p id="resetError"></p>
+      </form>
+
       <p>Remembered? <a href="login.html">Back to login</a></p>
     </div>
   </main>
+
+  <script>
+    const requestForm = document.getElementById("requestResetForm");
+    const requestMessageEl = document.getElementById("requestMessage");
+    const setPasswordForm = document.getElementById("setNewPasswordForm");
+    const resetErrorEl = document.getElementById("resetError");
+
+    // Step 1: person types their email, we ask Supabase to send a reset link.
+    // redirectTo tells Supabase to bring them back to THIS page afterward.
+    requestForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("resetEmail").value.trim();
+
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/reset.html"
+      });
+
+      if (error) {
+        requestMessageEl.textContent = error.message || "❌ Something went wrong.";
+        requestMessageEl.style.color = "red";
+      } else {
+        requestMessageEl.textContent = "✅ Check your email for a reset link.";
+        requestMessageEl.style.color = "green";
+        requestForm.reset();
+      }
+    });
+
+    // Step 2: Supabase fires this event automatically when the person arrives
+    // via the emailed link — that's our cue to swap to the "new password" form.
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        requestForm.style.display = "none";
+        setPasswordForm.style.display = "flex";
+        setPasswordForm.style.flexDirection = "column";
+        setPasswordForm.style.gap = "8px";
+      }
+    });
+
+    setPasswordForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const newPassword = document.getElementById("newPassword").value.trim();
+      const confirm = document.getElementById("newPasswordConfirm").value.trim();
+
+      resetErrorEl.textContent = "";
+
+      if (newPassword !== confirm) {
+        resetErrorEl.textContent = "Passwords do not match.";
+        resetErrorEl.style.color = "red";
+        return;
+      }
+
+      const { error } = await supabaseClient.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        resetErrorEl.textContent = error.message || "❌ Failed to reset password.";
+        resetErrorEl.style.color = "red";
+      } else {
+        alert("✅ Password reset successful! Please log in with your new password.");
+        window.location.href = "login.html";
+      }
+    });
+  </script>
 </body>
 </html>
