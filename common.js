@@ -1,4 +1,4 @@
-const APP_VERSION = "v1.02";
+const APP_VERSION = "v2.12";
   const CURRENT_YEAR = new Date().getFullYear();
 
   // 🔹 Supabase setup — shared across every page that loads common.js.
@@ -77,7 +77,7 @@ const APP_VERSION = "v1.02";
     <!-- ✅ FOOTER -->
     <div id="footer">
     <hr>
-      Speechdeb Editor <span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
+      Speechdeb Editor v0.1-<span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
       <a href="contact.html">Contact Support</a> •
       <a href="blog/blog.php">Blog</a> •
       <a href="https://linkedin.com/company/speechdeb">LinkedIn</a>
