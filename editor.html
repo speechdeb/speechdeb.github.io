@@ -178,12 +178,10 @@
 <script src="common.js" defer></script>
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-  // 🔹 Detect guest mode (same logic as common.js)
   const urlParams    = new URLSearchParams(window.location.search);
   const guestFromUrl = urlParams.get("guest") === "1";
   const guestMode    = guestFromUrl || localStorage.getItem("speechdeb_guest") === "1";
 
-  // 🔹 In guest mode, hide the share status + Copy Link controls
   if (guestMode) {
     const shareWrapper = document.getElementById("shareWrapper");
     if (shareWrapper) {
@@ -195,7 +193,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const payload = localStorage.getItem("speechdeb_editor_payload");
 
     if (!payload) {
-      // Retry a few times — because New Speech might still be setting it
       setTimeout(tryLoadEditor, 100);
       return;
     }
@@ -205,7 +202,7 @@ document.addEventListener("DOMContentLoaded", () => {
       speech = JSON.parse(payload);
     } catch (e) {
       alert("Invalid speech data. Redirecting...");
-      window.location.href = "index.php";
+      window.location.href = "index.html";
       return;
     }
 
