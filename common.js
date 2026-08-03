@@ -116,6 +116,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const guestFromUrl = urlParams.get("guest") === "1";
 
   if (guestFromUrl) {
+    // Sticky guest mode once you've entered via ?guest=1
     localStorage.setItem("speechdeb_guest", "1");
   }
 
@@ -134,6 +135,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const avatarImg     = document.getElementById("userAvatarDisplay");
 
   if (guestMode) {
+    // ✅ Guest navbar: default pic + "Guest"
     if (userPanelEl && emailDisplay) {
       userPanelEl.style.display = "block";
       emailDisplay.textContent  = "Guest";
@@ -142,6 +144,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       avatarImg.src = "favicon.png";
     }
   } else if (currentUser) {
+    // ✅ Normal logged-in user navbar — real Supabase profile fetch
     const { data: profile, error } = await supabaseClient
       .from("profiles")
       .select("*")
@@ -156,13 +159,14 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     if (avatarImg) {
       const src = (profile && profile.profile_picture_url) || "favicon.png";
-      avatarImg.src = src + (src.includes("?") ? "&" : "?") + "t=" + Date.now();
+      avatarImg.src = src + (src.includes("?") ? "&" : "?") + "t=" + Date.now(); // cache-bust
     }
 
     if (error) {
       console.error("❌ Failed to fetch user profile:", error);
     }
   } else {
+    // ❌ Not guest and not logged in → navbar stays hidden
     if (userPanelEl) {
       userPanelEl.style.display = "none";
     }
@@ -175,10 +179,12 @@ window.addEventListener("DOMContentLoaded", async () => {
   const support    = document.getElementById("support");
   const logoutBtn  = document.getElementById("logout");
 
+  // 🔹 Guest mode: hide Reset Password & Delete Account
   if (guestMode) {
     if (reset) reset.style.display = "none";
     if (del)   del.style.display   = "none";
   } else if (currentUser) {
+    // 🔹 Logged-in: wire up reset + delete
     if (reset) {
       reset.onclick = () => window.location.href = "reset.html";
     }
@@ -191,6 +197,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // These are fine for both guest + logged-in
   if (prefs)   prefs.onclick   = () => window.location.href = "https://speechdeb.infy.uk/settings.html";
   if (support) support.onclick = () => window.location.href = "http://speechdeb.infy.uk/contact.html";
 
@@ -198,7 +205,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   async function logout() {
     await supabaseClient.auth.signOut();
     localStorage.removeItem("speechdeb_guest");
-    window.location.href = "login.html";
+    window.location.href = "login.html"; // fixed from login.php
   }
   window.logout = logout;
   if (logoutBtn) logoutBtn.onclick = logout;
@@ -216,6 +223,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // ✅ Make toggleUserMenu accessible globally
   window.toggleUserMenu = () => {
     const menu  = document.getElementById("userMenuItems");
     const arrow = document.getElementById("userDropdownArrow");
@@ -267,7 +275,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("resize", checkScreenSize);
 });
 
-// Inject styles.css if not already present
+// ✅ Make it accessible to inline HTML
+
+  // Inject styles.css if not already present
   if (!document.querySelector('link[href="styles.css"]')) {
     const styleLink = document.createElement("link");
     styleLink.rel = "stylesheet";
@@ -288,7 +298,12 @@ function loadScriptAndInit() {
 }
 
 // ✅ Only load script.js on editor/menu pages, NOT on pure auth / public pages
-document.addEventListener("DOMContentLoaded", () => {
+// IMPORTANT: this waits for supabaseClient to actually be ready before
+// loading script.js — previously this ran as an independent listener that
+// could fire before window.supabaseClient existed, causing script.js's
+// saveSpeech()/getProfileAndLoadSpeeches() etc. to silently fail with
+// "supabaseClient is not defined" and nothing would save.
+document.addEventListener("DOMContentLoaded", async () => {
   const path = window.location.pathname;
 
   const isNonEditorPage =
@@ -300,8 +315,10 @@ document.addEventListener("DOMContentLoaded", () => {
     path.includes("404.html");
 
   if (isNonEditorPage) {
+    // These pages use their own inline JS
     return;
   }
 
+  await ensureSupabaseClient(); // wait until window.supabaseClient definitely exists
   loadScriptAndInit();
 });
