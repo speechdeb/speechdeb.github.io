@@ -39,23 +39,48 @@
       </div>
     </div>
   </main>
-
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const loginForm = document.getElementById("loginForm");
       const loginErrorEl = document.getElementById("loginError");
-
       if (loginForm) {
         loginForm.addEventListener("submit", async (e) => {
           e.preventDefault();
           const email = document.getElementById("loginEmail").value.trim();
           const password = document.getElementById("loginPassword").value.trim();
-
           const { data, error } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
           });
-
           if (error) {
             if (loginErrorEl) {
-              loginErrorEl.textContent =
+              loginErrorEl.textContent = error.message || "Login failed. Please try again.";
+              loginErrorEl.style.display = "block";
+              loginErrorEl.style.color = "#c00";
+            }
+          } else {
+            localStorage.setItem("speechdeb_email", email);
+            localStorage.removeItem("speechdeb_guest");
+            window.location.href = "user.html";
+          }
+
+          return false;
+        });
+      }
+
+      const stayBtn = document.getElementById("stayLoggedOutBtn");
+      if (stayBtn) {
+        stayBtn.addEventListener("click", function (e) {
+          e.preventDefault();
+
+          localStorage.setItem("speechdeb_guest", "1");
+          localStorage.removeItem("speechdeb_email");
+          localStorage.removeItem("speechdeb_loggedin");
+
+          window.location.href = "index.html?guest=1";
+        });
+      }
+    });
+  </script>
+</body>
+</html>
