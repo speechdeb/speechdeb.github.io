@@ -1487,11 +1487,16 @@ window.loadSpeechIntoEditorServer = async function (speechFromServer) {
 
   // Figure out ownership from the real Supabase session rather than an email match
   let isOwner = true;
-  if (!guestMode && parsed.user_id) {
+if (!guestMode && parsed.user_id) {
+  try {
     const { data: sessionData } = await supabaseClient.auth.getSession();
     const currentUser = sessionData?.session?.user;
     isOwner = !!(currentUser && parsed.user_id === currentUser.id);
+  } catch (e) {
+    console.error("Ownership check failed, defaulting to view-only:", e);
+    isOwner = false; // fail safe: treat as view-only rather than crash
   }
+}
 
   const speech = { ...parsed, is_owner: isOwner };
 
