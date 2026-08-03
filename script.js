@@ -1,13 +1,11 @@
 let sentenceIndex = 0;
 const savedLeague = localStorage.getItem("speechdeb_league") || "MMSSL";
-const loggedIn = localStorage.getItem("speechdeb_loggedin") === "true";
-const guestMode = localStorage.getItem("speechdeb_guest") === "1"; // ✅ NEW
+const guestMode = localStorage.getItem("speechdeb_guest") === "1";
 const textBox = document.getElementById("textBox");
 const textBoxEl = document.getElementById("textBox");
 let windowSpeechData = [];
 let isOwnerGlobal = false;
-let speechesAlreadyLoaded = false; // ✅ NEW FLAG
-const email = localStorage.getItem("speechdeb_email") || "";
+let speechesAlreadyLoaded = false;
 
 window.categorySets = {
   MSDL: [
@@ -40,7 +38,7 @@ window.categorySets = {
 
 window.descriptions = {};
 (window.categorySets[savedLeague] || []).forEach(name => {
-  window.descriptions[name] = name; // key = value, since you want no abbreviations
+  window.descriptions[name] = name;
 });
 
 function isOriginalCategory(categoryName) {
@@ -52,42 +50,57 @@ function isOriginalCategory(categoryName) {
 
 const payload = localStorage.getItem("speechdeb_editor_payload");
 
+// === Navigation (fixed: real Supabase session instead of email/userId flags) ===
 function goBackToMenu() {
   try {
-    // Do NOT clear guest flag here
-    localStorage.removeItem("speechdeb_editor_payload"); // only clear active editor payload
+    localStorage.removeItem("speechdeb_editor_payload");
   } catch (e) {
     console.warn("Could not clear editor payload:", e);
   }
 
-  const email   = localStorage.getItem("speechdeb_email");
-  const userId  = localStorage.getItem("userId");
   const isGuest = localStorage.getItem("speechdeb_guest") === "1";
 
-  // 🔹 Guest → always go to guest menu
   if (isGuest) {
-    window.location.href = "user.php?guest=1";
+    window.location.href = "user.html?guest=1";
     return;
   }
 
-  // 🔹 Logged-in user → go to their profile/menu
-  if (email) {
-    if (userId) {
-      // If we know the userId, use it explicitly
-      window.location.href = "user.php?id=" + encodeURIComponent(userId);
-    } else {
-      // No userId stored, but email exists → let user.php infer from session
-      window.location.href = "user.php";
-    }
-    return;
-  }
-
-  // 🔹 Truly unauthenticated → login screen
-  window.location.href = "login.php";
+  // Supabase tracks the session itself — no need to check email/userId manually
+  window.location.href = "user.html";
 }
 
 function toggleSettings() {
     window.location.href = "./settings.html";
+}
+
+// Replaces the two duplicate "user.php?action=get&id=..." lookups that used
+// to live inline in initScript() and showMenuView().
+async function getProfileAndLoadSpeeches() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const profileIdParam = urlParams.get("id");
+
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const currentUser = sessionData?.session?.user;
+
+  if (profileIdParam) {
+    const { data: profile, error } = await supabaseClient
+      .from("profiles")
+      .select("id")
+      .eq("id", profileIdParam)
+      .single();
+
+    if (error || !profile) {
+      window.location.href = "404.html";
+      return;
+    }
+
+    const isOwner = !!(currentUser && profile.id === currentUser.id);
+    loadSpeechesFromServer(profile.id, isOwner);
+  } else if (currentUser) {
+    loadSpeechesFromServer(currentUser.id, true);
+  } else if (guestMode) {
+    loadSpeechesFromServer(null, true);
+  }
 }
 
 window.initScript = function initScript() {
@@ -114,24 +127,7 @@ if (menuBtn) {
   // Initialize menu view
   const menuView = document.getElementById("menuView");
   if (menuView) {
-const urlParams = new URLSearchParams(window.location.search);
-const profileId = urlParams.get("id");
-const loggedInEmail = localStorage.getItem("speechdeb_email") || "";
-
-if (profileId) {
-  fetch(`user.php?action=get&id=${encodeURIComponent(profileId)}`)
-    .then(res => res.json())
-    .then(profile => {
-      const isOwner = (profile.email === loggedInEmail);
-      loadSpeechesFromServer(profile.email, isOwner);
-    })
-    .catch(err => {
-      console.error("⚠️ Failed to fetch profile:", err);
-      window.location.href = "404.html"; // Redirect if not found
-    });
-} else {
-  loadSpeechesFromServer(loggedInEmail, true);
-}
+    getProfileAndLoadSpeeches();
   }
 
   // Restore editor if payload exists
@@ -177,11 +173,6 @@ if (editorView) {
   const overwrite = localStorage.getItem("speechdeb_overwriteZip") === "true";
   const overwriteCheckbox = document.getElementById("overwriteZipCheckbox");
   if (overwriteCheckbox) overwriteCheckbox.checked = overwrite;
-
-  // Auth radio buttons
-  document.querySelectorAll('input[name="authMode"]').forEach(radio => {
-    radio.addEventListener("change", toggleAuthMode);
-  });
 
   // Preferences & navigation buttons
 const prefsBtn = document.getElementById("prefs");
@@ -271,56 +262,12 @@ function applySavedStyles(box, message) {
   box.innerHTML = message;
 }
 
-function toggleAuthMode() {
-        const loginForm = document.getElementById("loginForm");
-        const signupForm = document.getElementById("signupForm");
-        const resetForm = document.getElementById("passwordResetForm");
-        const verificationSection = document.getElementById("verificationSection");
-        const formHeading = document.getElementById("formHeading");
-        const selected = document.querySelector('input[name="authMode"]:checked').value;
-
-        // Reset all
-        loginForm.style.display = "none";
-        signupForm.style.display = "none";
-        resetForm.style.display = "none";
-        if (verificationSection) verificationSection.style.display = "none";
-
-        if (selected === "login") {
-            loginForm.style.display = "flex";
-            formHeading.textContent = "Login";
-        } else {
-            signupForm.style.display = "flex";
-            formHeading.textContent = "Sign Up";
-        }
-        }
-        
-        function handleSignup(event) {
-        event.preventDefault();
-
-        const email = document.getElementById("signupEmail").value.trim();
-        const password = document.getElementById("signupPassword").value.trim();
-
-
-        fetch('register.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
-        })
-        .then(response => response.text())
-        .then(data => {
-            if (data.toLowerCase().includes("success")) {
-        showMessage("✅ Signup successful! Please login.", "success", document.getElementById("signupForm"));
-        // No reload here — just let them switch to login manually
-        } else {
-        showMessage(data, "error");
-            }
-        })
-        .catch(err => {
-        showMessage("An error occurred. Please try again.", "error");
-        });
-
-        return false;
-        }
+// NOTE: handleSignup(), handleLogin(), toggleAuthMode(), showPasswordReset(),
+// showReset(), showAuthView() were removed here — they referenced #loginForm,
+// #signupForm, #authBox, #passwordResetForm etc. which don't exist anywhere
+// in editor.html. Auth now lives entirely on login.html/signup.html, wired
+// to Supabase directly, so this dead code (which posted to register.php /
+// login.php) has been deleted rather than converted.
 
 function formatRelativeTime(timestamp) {
     const now = Date.now();
@@ -356,7 +303,7 @@ function formatRelativeTime(timestamp) {
         let tourIsRunning = false;
         let attempts = 0;
         let detachedManually = false;
-        let overtimeStartTimestamp = null; // <-- Add this globally
+        let overtimeStartTimestamp = null;
         let resetAttempts = [];
         let cooldownTimeout = null;
         const flashTimers = {};
@@ -384,12 +331,10 @@ function formatRelativeTime(timestamp) {
 
         let timerRunning = false;
 
-
-
         let lastUpdate = 0;
-        const UPDATE_INTERVAL = 100; // update every 100ms
+        const UPDATE_INTERVAL = 100;
 
-        let lastSecond = BASE_TIME_SEC; // <- Add globally
+        let lastSecond = BASE_TIME_SEC;
 
         function formatTime(seconds, omitTenths = false) {
         const min = Math.floor(seconds / 60);
@@ -402,13 +347,11 @@ function formatRelativeTime(timestamp) {
         return n < 10 ? '0' + n : n;
         }
 
-        const flashedMarkers = {}; // ⬅️ NEW: to track what has already flashed
+        const flashedMarkers = {};
 
         function handleFlashes(nowSec, prevSec, elapsedScaled) {
         Object.entries(markerFlashes).forEach(([targetStr, id]) => {
             const target = Number(targetStr);
-
-            // ✅ Compare directly to currentTime
             if (currentTime <= target && !flashedMarkers[id]) {
             startFlash(id, 5000);
             flashedMarkers[id] = true;
@@ -492,10 +435,10 @@ function formatRelativeTime(timestamp) {
         let currentSpeechKey = null;
         let currentSpeechMetaKey = null;
 
-        // === Save & Autosave Logic ===
+        // === Save & Autosave Logic (rewritten for Supabase) ===
     function formatDateTime(date) {
         const pad = (n) => (n < 10 ? '0' + n : n);
-        const mm = pad(date.getMonth() + 1); // Months are 0-indexed
+        const mm = pad(date.getMonth() + 1);
         const dd = pad(date.getDate());
         const yyyy = date.getFullYear();
         const hh = pad(date.getHours());
@@ -505,7 +448,7 @@ function formatRelativeTime(timestamp) {
         return `${mm}/${dd}/${yyyy} at ${hh}:${min}:${sec}`;
     }
 
-function saveSpeech() {
+async function saveSpeech() {
   const titleEl = document.getElementById("speechTitle");
   const contentEl = document.getElementById("textBox");
   const categoryEl = document.getElementById("categorySelect");
@@ -521,11 +464,10 @@ function saveSpeech() {
   const contentHTML = contentEl.innerHTML.trim();
   const plainText = contentHTML.replace(/<[^>]+>/g, "").trim();
   const category = categoryEl.value.trim();
-  const memorized = memorizeMode ? 1 : 0;
-  const done = JSON.stringify(doneSentences || []);
+  const memorized = memorizeMode ? true : false;
+  const done = doneSentences || [];
   const shareStatus = shareEl?.value || "private";
-  const email = localStorage.getItem("speechdeb_email") || "";
-  const id = currentSpeechId || "";
+  const id = currentSpeechId || null;
 
   if (!title || title.length < 3) {
     showMessage("⚠️ Please enter a valid title (min 3 characters).", "warning");
@@ -542,53 +484,90 @@ function saveSpeech() {
 
   if (warningBox) applyWarningStyles(warningBox, "💾 Saving...");
 
-  const payload = new URLSearchParams({
-    email,
+  // Guest mode never hits the database — save locally instead
+  if (guestMode) {
+    saveGuestSpeechLocally({ id, title, content: contentHTML, category, shareStatus });
+    updateLastSaved();
+    return;
+  }
+
+  const { data: sessionData } = await supabaseClient.auth.getSession();
+  const currentUser = sessionData?.session?.user;
+
+  if (!currentUser) {
+    showMessage("❌ You must be logged in to save.", "error");
+    return;
+  }
+
+  const dbPayload = {
+    user_id: currentUser.id,
     title,
     content: contentHTML,
     category,
     memorization_mode: memorized,
     done_sentences: done,
     share_status: shareStatus,
-    id
-  });
+    updated_at: new Date().toISOString()
+  };
 
-  fetch("save_speech.php", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: payload.toString()
-  })
-    .then(res => res.text())
-    .then(responseText => {
+  let result;
+  if (id) {
+    result = await supabaseClient
+      .from("speeches")
+      .update(dbPayload)
+      .eq("id", id)
+      .eq("user_id", currentUser.id)
+      .select()
+      .single();
+  } else {
+    result = await supabaseClient
+      .from("speeches")
+      .insert({ ...dbPayload, created_at: new Date().toISOString() })
+      .select()
+      .single();
+  }
 
-      let parsed;
-      try {
-        parsed = JSON.parse(responseText);
-      } catch (err) {
-        console.error("❌ JSON parse error:", err);
-        showMessage("⚠️ Invalid response from server.", "warning");
-        return;
-      }
+  const { data, error } = result;
 
-      if (parsed.success) {
-  currentSpeechId = parsed.id;
+  if (error) {
+    console.error("❌ Save failed:", error);
+    showMessage("❌ Could not save: " + error.message, "error");
+    return;
+  }
+
+  currentSpeechId = data.id;
   updateLastSaved();
 
   const shareInput = document.getElementById("shareStatus");
   const shareDropdown = document.getElementById("shareDropdown");
   if (shareInput && shareDropdown) {
-    shareDropdown.value = shareInput.value; // ✅ Sync the UI
+    shareDropdown.value = shareInput.value;
   }
-} else if (parsed.error) {
-        showMessage(parsed.error, "error");
-      } else {
-        showMessage("⚠️ Unknown server response.", "warning");
-      }
-    })
-    .catch(err => {
-      console.error("❌ Save failed:", err);
-      showMessage("❌ Could not save to server. Check your internet connection.", "error");
-    });
+}
+
+// Minimal guest-mode save: updates the same localStorage array user.html reads from
+function saveGuestSpeechLocally({ id, title, content, category, shareStatus }) {
+  const GUEST_STORAGE_KEY = "speechdeb_guest_speeches";
+  let speeches = [];
+  try {
+    speeches = JSON.parse(localStorage.getItem(GUEST_STORAGE_KEY) || "[]");
+  } catch (e) {
+    speeches = [];
+  }
+
+  const now = new Date().toISOString();
+  const existingIndex = speeches.findIndex(s => s.id === id);
+
+  if (existingIndex >= 0) {
+    speeches[existingIndex] = { ...speeches[existingIndex], title, content, category, share_status: shareStatus, updated_at: now };
+    currentSpeechId = id;
+  } else {
+    const newId = id || Date.now();
+    speeches.push({ id: newId, title, content, category, share_status: shareStatus, created_at: now, updated_at: now });
+    currentSpeechId = newId;
+  }
+
+  localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify(speeches));
 }
 
         let lastSavedMessage = "";
@@ -654,7 +633,7 @@ function updateLastSaved() {
             pdf.text(line, marginLeft, y);
             y += lineHeight;
             });
-            y += lineHeight * 1.5; // extra space between paragraphs
+            y += lineHeight * 1.5;
         });
 
         return pdf.output("arraybuffer");
@@ -688,7 +667,6 @@ function updateWordCount() {
     wordCountEl.textContent = words.length;
   }
 
-  // ✅ Always update stats — allow timer status check inside
   updateTimingStats(totalElapsedSeconds || 0);
 }
 
@@ -704,7 +682,6 @@ function updateTimingStats(totalSeconds) {
   if (wpmValue) wpmValue.textContent = wpm;
   if (spwValue) spwValue.textContent = spw;
 
-  // Only animate needles if timer is running
   if (!timerRunning || totalSeconds <= 0) return;
 
   const maxWPM = 300;
@@ -723,7 +700,6 @@ function updateTimingStats(totalSeconds) {
     spwNeedle.style.transform = `rotate(${spwAngle}deg)`;
   }
 
-  // Update analog odometer
   const odometer = document.getElementById("odometer");
   if (odometer) {
     odometer.innerHTML = words
@@ -802,19 +778,9 @@ if (liveDropdown) {
   });
 }
 
-// ✅ NEW: Save speech when dropdown value changes
-
-if (liveDropdown && titleInput) {
-  liveDropdown.addEventListener("blur", saveSpeech);
-  liveDropdown.addEventListener("change", () => {
-    saveSpeech();
-    updateLastSaved();
-  });
-}
-
         // === Load on Startup ===
 const onEditorPage = !!document.getElementById("editorView");
-const onMenuPage = location.pathname.includes("index.php") || location.pathname.includes("user.php");
+const onMenuPage = location.pathname.includes("index.html") || location.pathname.includes("user.html");
 
 if (onEditorPage) {
   updateWordCount();
@@ -822,9 +788,8 @@ if (onEditorPage) {
                 // === Memorization Mode ===
         memorizeMode = false;
         let sentences = [];
-        let originalEditorHTML = ""; // ✅ stores full formatted HTML before entering memorize mode
+        let originalEditorHTML = "";
 		
-// Split a text string into sentence-like pieces, keeping punctuation + spaces.
 function splitTextIntoSentencePieces(text) {
   const pieces = [];
   const regex = /([^.!?]*[.!?]["')\]]*\s*|[^.!?]+$)/g;
@@ -840,9 +805,8 @@ function splitTextIntoSentencePieces(text) {
   return pieces.length ? pieces : [text];
 }
 
-let sentenceSpans = []; // all <span> wrappers we create
+let sentenceSpans = [];
 
-// Build memorize view FROM originalEditorHTML, preserving all formatting.
 function buildMemorizeViewFromOriginalHTML() {
   if (!originalEditorHTML) {
     originalEditorHTML = textBox.innerHTML || "";
@@ -860,7 +824,7 @@ function buildMemorizeViewFromOriginalHTML() {
       if (!raw || !raw.trim()) return;
 
       const parts = splitTextIntoSentencePieces(raw);
-      if (parts.length === 1) return; // no need to split
+      if (parts.length === 1) return;
 
       const frag = document.createDocumentFragment();
 
@@ -886,10 +850,8 @@ function buildMemorizeViewFromOriginalHTML() {
 
   Array.from(temp.childNodes).forEach(processNode);
 
-  // Set the editor HTML to the wrapped version.
   textBox.innerHTML = temp.innerHTML;
 
-  // Update sentences array for percentage calculations.
   sentences = sentenceSpans.map(span => span.textContent.trim()).filter(Boolean);
 }
 
@@ -907,14 +869,12 @@ if (memorizeBtn && titleInput && textBox) {
     const statsBox = document.getElementById("statsBox");
 
     if (!memorizeMode) {
-      // ▶ ENTER MEMORIZE MODE
-      originalEditorHTML = textBox.innerHTML || "";  // snapshot full formatted HTML
+      originalEditorHTML = textBox.innerHTML || "";
       memorizeMode = true;
 
       titleInput.disabled = true;
       textBox.contentEditable = false;
 
-      // Build span-wrapped version from the original formatted HTML
       buildMemorizeViewFromOriginalHTML();
       prepareSentences();
       sentenceIndex = 0;
@@ -930,18 +890,15 @@ if (memorizeBtn && titleInput && textBox) {
       memorizeBtn.textContent = "Unmemorize";
       memorizeBtn.classList.add("active");
     } else {
-      // ◀ EXIT MEMORIZE MODE
       memorizeMode = false;
 
       titleInput.disabled = false;
       textBox.contentEditable = true;
 
-      // Restore the original formatted HTML exactly
       if (originalEditorHTML) {
         textBox.innerHTML = originalEditorHTML;
       }
 
-      // Reset internal state
       sentenceSpans = [];
       sentences = [];
       sentenceIndex = 0;
@@ -965,11 +922,10 @@ if (memorizeBtn && titleInput && textBox) {
   });
 }
 
-// === Sentence Parsing & Highlighting (span-based, preserves formatting) ===
+// === Sentence Parsing & Highlighting ===
 function prepareSentences() {
   if (!memorizeMode) return;
 
-  // If spans haven't been built yet (e.g. loaded with memorization_mode = 1), build them now
   if (!sentenceSpans || sentenceSpans.length === 0) {
     buildMemorizeViewFromOriginalHTML();
   }
@@ -1048,7 +1004,6 @@ if (nextBtn) {
   });
 }
 
-        // Keeping track of memorization
         lightHighlightToggle?.addEventListener("change", () => {
         if (lightHighlightToggle.checked) {
             if (!doneSentences.includes(sentenceIndex)) {
@@ -1064,7 +1019,7 @@ if (nextBtn) {
         });
 
         function syncDoneCheckbox() {
-  if (!lightHighlightToggle) return; // ✅ Safeguard if checkbox is missing
+  if (!lightHighlightToggle) return;
   lightHighlightToggle.checked = doneSentences.includes(sentenceIndex);
 }
 
@@ -1102,12 +1057,11 @@ if (nextBtn) {
             const [category, name] = meta.split("::");
             const rawHtml = localStorage.getItem(key);
 
-            // Convert HTML to plain text and preserve paragraph line breaks
             const container = document.createElement("div");
             container.innerHTML = rawHtml;
             const textContent = Array.from(container.childNodes).map(node =>
             node.textContent.trim()
-            ).join("\n\n"); // Two newlines to preserve paragraph separation
+            ).join("\n\n");
 
             const filename = `${(window.categorySets?.[category]?.split(":")[0] || "Speech")}_${name}`
             .replace(/[^\w\s-]/g, "")
@@ -1127,10 +1081,10 @@ if (nextBtn) {
         const maxY = pageHeight - marginTop;
         let y = marginTop;
 
-        const paragraphs = cleanedText.split(/\n{2,}/); // split on double newlines (paragraphs)
+        const paragraphs = cleanedText.split(/\n{2,}/);
 
         paragraphs.forEach((para) => {
-        const lines = pdf.splitTextToSize(para.trim(), 180); // split lines within paragraph
+        const lines = pdf.splitTextToSize(para.trim(), 180);
 
         lines.forEach((line) => {
             if (y + lineHeight > maxY) {
@@ -1141,7 +1095,6 @@ if (nextBtn) {
             y += lineHeight;
         });
 
-        // Add extra line between paragraphs
         y += lineHeight;
         });
 
@@ -1174,7 +1127,6 @@ if (timerBox) {
     const offsetX = event.clientX - rect.left;
     const offsetY = event.clientY - rect.top;
 
-    // Only toggle if clicking near top-right
     if (offsetX > rect.width - 20 && offsetY < 20) {
       if (timerBox.classList.contains('small')) {
         expandTimer();
@@ -1239,24 +1191,24 @@ if (expandBtn && collapseBtn) {
 
         function startTimer() {
             timerRunning = true;
-        stopTimer(); // Always clear any old timer
+        stopTimer();
         startTimestamp = performance.now();
         overtime = false;
-        currentTime = 450; // start at 7:30
-        totalElapsedSeconds = 0; // reset tracker
+        currentTime = 450;
+        totalElapsedSeconds = 0;
         timerInterval = requestAnimationFrame(updateTimer);
         }
 
         function updateTimer(now) {
         if (!startTimestamp) return;
 
-        const elapsed = (now - startTimestamp) / 1000; // seconds
+        const elapsed = (now - startTimestamp) / 1000;
 
         if (!overtime) {
             currentTime = 450 - elapsed;
             if (currentTime <= 0) {
             overtime = true;
-            startTimestamp = performance.now(); // reset when overtime starts
+            startTimestamp = performance.now();
             currentTime = 0;
             }
         } else {
@@ -1290,39 +1242,8 @@ if (startTimestamp !== null && currentTime > 0) {
             }
         }
 
-        updateTimingStats(totalElapsedSeconds); // <-- ✅ update WPM and SPW nicely
+        updateTimingStats(totalElapsedSeconds);
         startTimestamp = null;
-    }
-
-        function handleLogin(event) {
-        event.preventDefault();
-
-        const password = document.getElementById("loginPassword").value.trim();
-        const email = document.getElementById("loginEmail").value.trim();
-
-        fetch('login.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
-        })
-        .then(response => response.text())
-        .then(data => {
-            if (data.includes("Login successful")) {
-            // ✅ Save to localStorage
-            localStorage.setItem('speechdeb_loggedin', 'true');
-            localStorage.setItem('speechdeb_email', email);
-
-            // ✅ Force reload
-            location.reload();
-            } else {
-        showMessage(data, "error");
-            }
-        })
-        .catch(err => {
-        showMessage("An error occurred. Please try again.", "error");
-        });
-
-        return false;
     }
 
 const memNav = document.getElementById("memNav");
@@ -1356,7 +1277,6 @@ function createNewSpeech() {
     const uploadFile = document.getElementById("uploadFile");
       const statsBox = document.getElementById("statsBox");
 
-
   if (formatControls) formatControls.style.display = "flex";
   if (uploadFile) uploadFile.style.display = "inline-block";
   if (statsBox) statsBox.style.display = "block";
@@ -1366,46 +1286,16 @@ function createNewSpeech() {
     title: "",
     content: "",
     category: "",
-    memorization_mode: 0,
-    done_sentences: "[]",
-    owner_email: email   // ✅ FIXED — pass owner_email explicitly
+    memorization_mode: false,
+    done_sentences: [],
+    is_owner: true
   });
 }
 
-async function loadSpeechesFromServer(emailToLoad, isOwner) {
-  if (speechesAlreadyLoaded) return; // ✅ Prevent double load
-  speechesAlreadyLoaded = true;      // ✅ Set flag once
-
-  const email = emailToLoad;
-  if (!email) return;
-
-  let data;
-
-  try {
-    const response = await fetch('load_speeches.php', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      credentials: 'include',
-      body: `email=${encodeURIComponent(email)}`
-    });
-
-    const text = await response.text();
-
-    try {
-      data = JSON.parse(text);
-      windowSpeechData = data;
-      isOwnerGlobal = isOwner;
-    } catch (err) {
-      throw new Error("❌ Invalid JSON from server");
-    }
-
-    if (!Array.isArray(data)) {
-      throw new Error("❌ Server returned unexpected format (not an array)");
-    }
-  } catch (err) {
-    showMessage(err.message || "❌ Failed to load speeches.", "error");
-    return;
-  }
+// === Load speeches for the menu view (rewritten for Supabase) ===
+async function loadSpeechesFromServer(profileId, isOwner) {
+  if (speechesAlreadyLoaded) return;
+  speechesAlreadyLoaded = true;
 
   const container = document.getElementById("menuView");
   if (!container) {
@@ -1413,20 +1303,41 @@ async function loadSpeechesFromServer(emailToLoad, isOwner) {
     return;
   }
 
-// Always clear first
-container.innerHTML = "";
+  let speeches = [];
 
-// Render speeches
-renderSpeechBoxes(data, isOwner);
+  if (guestMode) {
+    try {
+      speeches = JSON.parse(localStorage.getItem("speechdeb_guest_speeches") || "[]");
+    } catch (e) {
+      speeches = [];
+    }
+  } else {
+    if (!profileId) return;
+    const { data, error } = await supabaseClient
+      .from("speeches")
+      .select("*")
+      .eq("user_id", profileId)
+      .order("updated_at", { ascending: false });
 
-// Save references
-originalSpeechBoxes = Array.from(document.querySelectorAll('.speechBox'));
+    if (error) {
+      showMessage("❌ Failed to load speeches: " + error.message, "error");
+      return;
+    }
+    speeches = data;
+  }
+
+  windowSpeechData = speeches;
+  isOwnerGlobal = isOwner;
+
+  container.innerHTML = "";
+  renderSpeechBoxes(speeches, isOwner);
+  originalSpeechBoxes = Array.from(document.querySelectorAll('.speechBox'));
 }
 
 function renderSpeechBoxes(data, isOwner) {
   const container = document.getElementById("menuView");
 
-      if (isOwner) {
+  if (isOwner) {
     const newSpeechBtn = document.createElement("button");
     newSpeechBtn.id = "newSpeechBtn";
     newSpeechBtn.textContent = "New Speech";
@@ -1436,18 +1347,13 @@ function renderSpeechBoxes(data, isOwner) {
     container.appendChild(document.createElement("br"));
   }
 
-// If no speeches
-if (data.length === 0) {
-
-  const emptyMsg = document.createElement("div");
-  emptyMsg.id = "noSpeechesMessage";
-  emptyMsg.textContent = "No speeches found for this user.";
-  emptyMsg.style = "margin-top: 20px; font-size: 20px; color: #666; text-align: center;";
-  container.appendChild(emptyMsg);
-}
-
-  // DO NOT reset container.innerHTML — already done in loadSpeechesFromServer
-  // Only add speech boxes here
+  if (data.length === 0) {
+    const emptyMsg = document.createElement("div");
+    emptyMsg.id = "noSpeechesMessage";
+    emptyMsg.textContent = "No speeches found for this user.";
+    emptyMsg.style = "margin-top: 20px; font-size: 20px; color: #666; text-align: center;";
+    container.appendChild(emptyMsg);
+  }
 
   data.forEach(speech => {
     const box = document.createElement("div");
@@ -1466,8 +1372,8 @@ if (data.length === 0) {
     `;
 
     const titleLine = `[${speech.category}] ${speech.title}`;
-    const statusLine = speech.is_owner
-      ? (speech.memorization_mode === 1
+    const statusLine = isOwner
+      ? (speech.memorization_mode
           ? `Finalized • Last viewed ${formatRelativeTime(speech.updated_at || speech.created_at)}`
           : `Last edited ${formatRelativeTime(speech.updated_at || speech.created_at)}`
         )
@@ -1479,41 +1385,36 @@ if (data.length === 0) {
           <div style="font-weight: bold; font-size: 18px;">${titleLine}</div>
           ${statusLine ? `<div style="color: #666; font-size: 14px;">${statusLine}</div>` : ''}
         </div>
-        ${speech.is_owner
+        ${isOwner
           ? `<button class="deleteBtn" style="margin-left: 20px; background-color: #cc0000; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Delete</button>`
           : ''}
       </div>
     `;
 
-    if (speech.is_owner) {
+    if (isOwner) {
       const deleteBtn = box.querySelector(".deleteBtn");
       if (deleteBtn) {
         deleteBtn.onclick = (e) => {
           e.stopPropagation();
           showCustomAlert({
             heading: "Delete Speech?",
-            message: `Are you sure you want to delete your ${speech.category} speech “${speech.title}”? This cannot be undone.`,
-            onConfirm: () => {
-              // Add page reload after delete:
-              fetch('delete_speech.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: `id=${encodeURIComponent(speech.id)}&email=${encodeURIComponent(localStorage.getItem("speechdeb_email") || "")}`
-              })
-              .then(response => response.text())
-              .then(text => {
-                try {
-                  const parsed = JSON.parse(text);
-                  if (parsed.success) {
-                    showMessage("✅ Deleted successfully! Reloading...", "success");
-                    setTimeout(() => location.reload(), 1000);
-                  } else {
-                    showMessage(parsed.error || "❌ Failed to delete speech.", "error");
-                  }
-                } catch {
-                  showMessage("❌ Server error during deletion.", "error");
-                }
-              });
+            message: `Are you sure you want to delete your ${speech.category} speech "${speech.title}"? This cannot be undone.`,
+            onConfirm: async () => {
+              if (guestMode) {
+                let all = JSON.parse(localStorage.getItem("speechdeb_guest_speeches") || "[]");
+                all = all.filter(s => s.id !== speech.id);
+                localStorage.setItem("speechdeb_guest_speeches", JSON.stringify(all));
+                showMessage("✅ Deleted successfully! Reloading...", "success");
+                setTimeout(() => location.reload(), 1000);
+                return;
+              }
+              const { error } = await supabaseClient.from("speeches").delete().eq("id", speech.id);
+              if (error) {
+                showMessage(error.message || "❌ Failed to delete speech.", "error");
+              } else {
+                showMessage("✅ Deleted successfully! Reloading...", "success");
+                setTimeout(() => location.reload(), 1000);
+              }
             }
           });
         };
@@ -1524,15 +1425,13 @@ if (data.length === 0) {
     container.appendChild(box);
   });
 
-  // Show or hide Filters box depending on data.length
-const filtersBox = document.getElementById("filtersBox");
-if (filtersBox) {
-  filtersBox.style.display = (data.length > 0) ? "block" : "none";
-}
+  const filtersBox = document.getElementById("filtersBox");
+  if (filtersBox) {
+    filtersBox.style.display = (data.length > 0) ? "block" : "none";
+  }
 }
 
 function showEditorView(speech) {
-  // 🛡️ Validate the speech object before saving
   if (!speech || typeof speech !== "object") {
     console.error("❌ No speech object provided.");
     showMessage("Error: No speech data provided.", "error");
@@ -1541,65 +1440,34 @@ function showEditorView(speech) {
 
   const { title, content, category } = speech;
 
-// Allow empty fields only if speech.id is null (new)
-// ✅ Safe check for new speech:
-const isNewSpeech = (speech.id === null || speech.id === undefined);
+  const isNewSpeech = (speech.id === null || speech.id === undefined);
 
-if (!isNewSpeech && (!speech.title || !speech.content || !speech.category)) {
-  console.error("❌ Incomplete speech:", speech);
-  showMessage("Error: Incomplete speech data (title/content/category missing).", "error");
-  return;
-}
+  if (!isNewSpeech && (!speech.title || !speech.category)) {
+    console.error("❌ Incomplete speech:", speech);
+    showMessage("Error: Incomplete speech data (title/category missing).", "error");
+    return;
+  }
 
   try {
-const email = localStorage.getItem("speechdeb_email") || "";
-const enrichedSpeech = {
-  ...speech,
-  owner_email: speech.owner_email || email // fallback to current user if missing
-};
-localStorage.setItem("speechdeb_editor_payload", JSON.stringify(enrichedSpeech));
+    localStorage.setItem("speechdeb_editor_payload", JSON.stringify(speech));
   } catch (e) {
     console.error("❌ Failed to store speech in localStorage:", e);
     showMessage("Error: Could not store speech data.", "error");
     return;
   }
 
-const isOriginal = isOriginalCategory(category);
-const copyLinkBtn = document.getElementById("copyLinkBtn");
-if (copyLinkBtn) copyLinkBtn.style.display = isOriginal ? "none" : "inline-block";
-const shareStatus = document.getElementById("shareStatus");
-if (shareStatus) shareStatus.parentElement.style.display = isOriginal ? "none" : "block";
+  const isOriginal = isOriginalCategory(category);
+  const copyLinkBtn = document.getElementById("copyLinkBtn");
+  if (copyLinkBtn) copyLinkBtn.style.display = isOriginal ? "none" : "inline-block";
+  const shareStatus = document.getElementById("shareStatus");
+  if (shareStatus) shareStatus.parentElement.style.display = isOriginal ? "none" : "block";
 
-  // ✅ Give localStorage time to finish before redirect
   setTimeout(() => {
     window.location.href = "editor.html";
   }, 100);
 }
 
-
-function deleteSpeechFromServer(speechId) {
-  fetch('delete_speech.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `id=${encodeURIComponent(speechId)}&email=${encodeURIComponent(localStorage.getItem("speechdeb_email") || "")}`
-  })
-  .then(response => response.text())
-  .then(text => {
-    try {
-      const parsed = JSON.parse(text);
-      if (parsed.success) {
-        showMessage("✅ Deleted successfully!", "success");
-        setTimeout(() => location.reload(), 1000);
-      } else {
-        showMessage(parsed.error || "❌ Failed to delete speech.", "error");
-      }
-    } catch {
-      showMessage("❌ Server error during deletion.", "error");
-    }
-  });
-}
-
-window.loadSpeechIntoEditorServer = function (speechFromServer) {
+window.loadSpeechIntoEditorServer = async function (speechFromServer) {
   const payload = localStorage.getItem("speechdeb_editor_payload");
 
   if (!payload) {
@@ -1607,9 +1475,7 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
     return;
   }
 
-  const currentEmail = localStorage.getItem("speechdeb_email") || "";
   let parsed;
-
   try {
     parsed = JSON.parse(payload);
   } catch (e) {
@@ -1619,24 +1485,26 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
     return;
   }
 
-  const speech = {
-    ...parsed,
-    is_owner: parsed.owner_email === currentEmail,
-  };
+  // Figure out ownership from the real Supabase session rather than an email match
+  let isOwner = true;
+  if (!guestMode && parsed.user_id) {
+    const { data: sessionData } = await supabaseClient.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+    isOwner = !!(currentUser && parsed.user_id === currentUser.id);
+  }
 
-  // Allow empty title/content for new speeches; warn only in weird shared cases
+  const speech = { ...parsed, is_owner: isOwner };
+
   if (speech.id !== null && !speech.title && !speech.is_owner) {
     showMessage("⚠️ Viewing a shared speech with no title.", "warning");
   }
 
-  // --- Basic editor setup ---
   const editorView = document.getElementById("editorView");
   const menuView = document.getElementById("menuView");
 
   if (editorView) editorView.style.display = "block";
   if (menuView) menuView.style.display = "none";
 
-  // Ensure category section exists
   if (!document.getElementById("categorySection")) {
     createCategorySection();
   }
@@ -1649,17 +1517,9 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
   currentSpeechId = speech.id;
   currentSpeechTitle = speech.title || "";
   currentSpeechCategory = speech.category || null;
-  memorizeMode = speech.memorization_mode === 1;
+  memorizeMode = !!speech.memorization_mode;
 
-  const isOwner = speech.is_owner;
-
-  // --- Restore doneSentences ---
-  try {
-    doneSentences = JSON.parse(speech.done_sentences || "[]");
-    if (!Array.isArray(doneSentences)) doneSentences = [];
-  } catch {
-    doneSentences = [];
-  }
+  doneSentences = Array.isArray(speech.done_sentences) ? speech.done_sentences : [];
 
   const titleInput = document.getElementById("speechTitle");
   const shareDropdown = document.getElementById("shareStatus");
@@ -1680,11 +1540,9 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
     shareDropdown.value = speech.share_status;
   }
 
-  // 🔹 Use the exact HTML that was saved, so formatting is preserved
   textBox.innerHTML = speech.content || "";
   updateWordCount();
 
-  // === Non-owner: view-only memorize mode ===
   if (!isOwner) {
     memorizeMode = true;
 
@@ -1700,7 +1558,6 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
     if (statsBox) statsBox.style.display = "none";
     if (memNav) memNav.style.display = "flex";
 
-    // ✅ Build memorize spans from the loaded HTML
     originalEditorHTML = textBox.innerHTML || "";
     buildMemorizeViewFromOriginalHTML();
     prepareSentences();
@@ -1711,11 +1568,10 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
     return;
   }
 
-  // === Owner: memorize mode on ===
   if (memorizeMode) {
     if (textBox) textBox.contentEditable = false;
     if (titleInput) titleInput.disabled = true;
-    if (dropdown) dropdown.disabled = false; // category shown but not locked by default
+    if (dropdown) dropdown.disabled = false;
     if (shareDropdown) shareDropdown.disabled = false;
 
     if (memNav) memNav.style.display = "flex";
@@ -1729,14 +1585,12 @@ window.loadSpeechIntoEditorServer = function (speechFromServer) {
       memorizeBtn.textContent = "Unmemorize";
     }
 
-    // ✅ Build memorize spans from the loaded HTML
     originalEditorHTML = textBox.innerHTML || "";
     buildMemorizeViewFromOriginalHTML();
     prepareSentences();
     highlightSentence();
     updateSentenceCounter();
   } else {
-    // === Owner: editable mode ===
     if (textBox) {
       textBox.contentEditable = true;
     }
@@ -1799,22 +1653,14 @@ const currentLeague = localStorage.getItem("speechdeb_league") || "MMSSL";
 });
 
 const memorizeBtn = document.getElementById("memorizeBtn");
-const container = document.querySelector(".titleRow"); // this is correct
+const container = document.querySelector(".titleRow");
 
 if (container && memorizeBtn) {
   container.insertBefore(dropdown, memorizeBtn);
 } else if (container) {
   container.appendChild(dropdown);
   console.warn("⚠️ #memorizeBtn not found — dropdown appended to container");
-}
-
-  // ✅ Otherwise, insert at the end of #editorTopControls
-  else if (container) {
-    container.appendChild(dropdown);
-    console.warn("⚠️ #memorizeBtn not found in container — dropdown appended to editorTopControls");
-  }
-  // ✅ Fallback: insert in #editorView
-  else {
+} else {
     const fallback = document.getElementById("editorView");
     if (fallback) {
       fallback.insertBefore(dropdown, fallback.firstChild);
@@ -1840,109 +1686,11 @@ if (uploadInput && textBox) {
   });
 }
 
-        function showPasswordReset() {
-        document.getElementById("loginForm").style.display = "none";
-        document.getElementById("signupForm").style.display = "none";
-        document.getElementById("passwordResetForm").style.display = "flex";
-        document.getElementById("formHeading").textContent = "Password Reset";
-        }
-
-        let resetCodeAttempts = [];
-        let cooldownActive = false;
-
-        function sendResetCode() {
-        const email = document.getElementById("resetEmail").value.trim();
-        const button = document.querySelector("button[onclick='sendResetCode()']");
-
-    if (!email) {
-    showMessage("⚠️ Please enter your email.", "warning");
-    return;
-    }
-
-        const now = Date.now();
-
-        // Filter attempts to last 10 minutes
-        resetCodeAttempts = resetCodeAttempts.filter(t => now - t < 10 * 60 * 1000);
-
-        if (resetCodeAttempts.length >= 3) {
-            showMessage("⚠️ You’ve reached the maximum number of code requests (3) in 10 minutes.", "warning", 8000);
-            return;
-        }
-
-        if (cooldownActive) {
-            showMessage("⏳ Please wait before requesting another code.", "info", 6000);
-            return;
-        }
-
-        // Set cooldown
-        cooldownActive = true;
-        button.disabled = true;
-        button.textContent = "Please wait...";
-        setTimeout(() => {
-            cooldownActive = false;
-            button.disabled = false;
-            button.textContent = "Send Code";
-        }, 60000); // 60 seconds
-
-        // Record this attempt
-        resetCodeAttempts.push(now);
-
-        fetch('send_reset_code.php', { 
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `email=${encodeURIComponent(email)}`
-        })
-        .then(response => response.text())
-        .then(data => {
-            data = (typeof data === "string") ? data.trim() : "";
-            if (data.toLowerCase().includes("sent")) {
-            document.getElementById("verificationSection").style.display = "flex";
-            showMessage("✅ Verification code sent! Check your inbox.", "success", 6000);
-            } else {
-            const fallback = "❌ Failed to send reset code. Please try again or contact <a href='mailto:support@speechdeb.infy.uk' style='color:inherit; text-decoration:underline;'>support</a>.";
-            showMessage(data || fallback, "error", 8000);
-            }
-        })
-        .catch(err => {
-            showMessage("An error occurred. Please try again.", "error");
-        });
-        }
-
-        function handlePasswordReset(event) {
-        event.preventDefault();
-
-        const email = document.getElementById("resetEmail").value.trim();
-        const code = document.getElementById("verificationCode").value.trim();
-        const newPassword = document.getElementById("newPassword").value.trim();
-
-        fetch('reset_password.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `email=${encodeURIComponent(email)}&code=${encodeURIComponent(code)}&new_password=${encodeURIComponent(newPassword)}`
-        })
-        .then(response => response.text())
-        .then(data => {
-        data = (typeof data === "string") ? data.trim() : "";
-        if (data.toLowerCase().includes("successful")) {
-            showMessage("✅ Password reset successful! Please login with your new password.", "success");
-            location.reload();
-        } else {
-        const fallback = "❌ Password reset failed. Please check your code and try again. If this issue persists, contact <a href='mailto:support@speechdeb.infy.uk' style='text-decoration: none;'>support</a>.";
-            showMessage(data || fallback, "error");
-        }
-        })
-        .catch(err => {
-        showMessage("An error occurred. Please try again.", "error");
-        });
-
-        return false;
-        }
-
-        function logout() {
-        localStorage.removeItem("speechdeb_loggedin");
-        localStorage.removeItem("speechdeb_email");
-        location.reload(); // Reload the page to show login form again
-        }
+// NOTE: showPasswordReset(), sendResetCode(), handlePasswordReset(), showReset()
+// were removed — they referenced #resetEmail/#verificationCode/#newPassword/
+// #verificationSection, which don't exist in editor.html. Send reset.html
+// (the page login.html's "Forgot Password?" link points to) and I'll wire
+// real Supabase password-reset logic there instead.
 
 function showCustomAlert({ heading, message, onConfirm, onCancel = () => {} }) {
   if (confirm(`${heading}\n\n${message}`)) {
@@ -1954,7 +1702,7 @@ function showCustomAlert({ heading, message, onConfirm, onCancel = () => {} }) {
 
 function showConfirmBox(message, onConfirm, onCancel = () => {}) {
   if (typeof message === "object" && message.message) {
-    message = message.message; // extract actual string
+    message = message.message;
   }
 
   if (confirm(message)) {
@@ -1963,7 +1711,6 @@ function showConfirmBox(message, onConfirm, onCancel = () => {}) {
     onCancel();
   }
 }
-
 
 function showEditorPageLayout(speech) {
       const authBox = document.getElementById("authBox");
@@ -1981,8 +1728,8 @@ function showEditorPageLayout(speech) {
   const statsBox = document.getElementById("statsBox");
   const dropdown = document.getElementById("categorySelect");
   const titleInput = document.getElementById("speechTitle");
+  const shareDropdown = document.getElementById("shareStatus");
 
-  // Hide other views
   if (authBox) authBox.style.display = "none";
   if (menuView) menuView.style.display = "none";
   if (editorView) editorView.style.display = "block";
@@ -1991,9 +1738,7 @@ function showEditorPageLayout(speech) {
   if (supportPopup) supportPopup.style.display = "none";
   if (settingsBox) settingsBox.style.display = "none";
 
-  // Reset or apply memorization state
 if (!speech.is_owner) {
-  // 🔒 View-only mode for shared speech
   if (textBox) textBox.contentEditable = false;
   if (titleInput) {
     titleInput.value = speech.title || "";
@@ -2013,7 +1758,6 @@ if (!speech.is_owner) {
   if (categorySection) categorySection.style.display = "none";
 
 } else if (memorizeMode) {
-  // 🧠 Finalized mode for owner
   if (textBox) textBox.contentEditable = false;
   if (titleInput) titleInput.disabled = true;
   if (dropdown) dropdown.disabled = true;
@@ -2031,7 +1775,6 @@ if (!speech.is_owner) {
   if (statsBox) statsBox.style.display = "none";
 
 } else {
-  // ✍️ Editable mode for owner
   if (textBox) {
     textBox.contentEditable = true;
     textBox.innerText = "";
@@ -2058,84 +1801,72 @@ if (!speech.is_owner) {
   if (statsBox) statsBox.style.display = "block";
 }
 
-  // Reset category dropdown
   if (dropdown) {
     dropdown.disabled = false;
     dropdown.selectedIndex = 0;
   }
 
-  // Clear sentence data
   doneSentences = [];
   sentenceIndex = 0;
 
   updateWordCount();
   updateLastSaved();
 }
-    function showReset() {
-    const authBox = document.getElementById("authBox");
-    const loginForm = document.getElementById("loginForm");
-    const signupForm = document.getElementById("signupForm");
-    const resetForm = document.getElementById("passwordResetForm");
-    const formHeading = document.getElementById("formHeading");
-
-    if (authBox) {
-        authBox.style.display = "block";
-        window.scrollTo({ top: 0, behavior: 'smooth' }); // optional
-    }
-
-    // Hide others, show reset form
-    if (loginForm) loginForm.style.display = "none";
-    if (signupForm) signupForm.style.display = "none";
-    if (resetForm) resetForm.style.display = "flex";
-    if (formHeading) formHeading.textContent = "Password Reset";
-
-    const radioLogin = document.querySelector('input[value="login"]');
-    const radioSignup = document.querySelector('input[value="signup"]');
-    if (radioLogin) radioLogin.checked = false;
-    if (radioSignup) radioSignup.checked = false;
-
-    // Optional: pre-fill email if available
-    const emailInput = document.getElementById("resetEmail");
-    const storedEmail = localStorage.getItem("speechdeb_email");
-    if (emailInput && storedEmail) {
-        emailInput.value = storedEmail;
-    }
-    }
 
     function closeCustomAlert() {
     document.getElementById("customAlertBox").style.display = "none";
     }
 
+    // === Account deletion (rewritten for Supabase) ===
+    // This deletes the person's own data (profile row + all their speeches)
+    // and signs them out — that part works with plain client-side Supabase
+    // calls under RLS. Fully removing the underlying login/auth record still
+    // needs a Supabase Edge Function running with elevated privileges, since
+    // client-side code is intentionally not allowed to delete auth accounts.
+    // The line below marks exactly where that function call would go once
+    // that Edge Function exists.
     function confirmAccountDeletion() {
     showCustomAlert({
         heading: "Confirm Account Deletion",
-        message: "This will permanently delete your account and all speeches. Proceed?",
-        onConfirm: () => {
-        const email = localStorage.getItem("speechdeb_email");
-        if (!email) {
+        message: "This will permanently delete your account data and all speeches. Proceed?",
+        onConfirm: async () => {
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        const currentUser = sessionData?.session?.user;
+
+        if (!currentUser) {
             showMessage("You must be logged in to delete your account.", "error");
             return;
         }
 
-        fetch('delete_account.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `email=${encodeURIComponent(email)}`,
-            credentials: 'include'
-        })
-        .then(res => res.text())
-        .then(data => {
-            if (data.toLowerCase().includes("success")) {
-            localStorage.clear();
-            showMessage("✅ Account deleted successfully. Redirecting...");
-            setTimeout(() => location.reload(), 1500);
-            } else {
-            showMessage(data || "❌ Failed to delete account.", "error");
-            }
-        })
-        .catch(err => {
-            showMessage("❌ Error deleting account.", "error");
-        });
+        const { error: speechesError } = await supabaseClient
+          .from("speeches")
+          .delete()
+          .eq("user_id", currentUser.id);
+
+        const { error: profileError } = await supabaseClient
+          .from("profiles")
+          .delete()
+          .eq("id", currentUser.id);
+
+        if (speechesError || profileError) {
+          showMessage(
+            (speechesError || profileError).message || "❌ Failed to delete account data.",
+            "error"
+          );
+          return;
+        }
+
+        // TODO: call a Supabase Edge Function here to fully delete
+        // currentUser.id from auth.users using the service-role key.
+        // e.g.: await fetch('https://<project>.functions.supabase.co/delete-user', {
+        //   method: 'POST',
+        //   headers: { Authorization: `Bearer ${sessionData.session.access_token}` }
+        // });
+
+        await supabaseClient.auth.signOut();
+        localStorage.clear();
+        showMessage("✅ Account data deleted. Redirecting...", "success");
+        setTimeout(() => location.reload(), 1500);
         }
     });
     }
@@ -2153,42 +1884,15 @@ if (!speech.is_owner) {
     alert("✅ Settings saved successfully.");
   }
 
-function showAuthView() {
-    document.getElementById("authBox").style.display = "block";
-    document.getElementById("menuView").style.display = "none";
-    document.getElementById("editorView").style.display = "none";
-}
-
 function showMenuView() {
   const menu = document.getElementById("menuView");
   if (!menu) return;
 
-  // Clear menu view first
   menu.innerHTML = "";
-
-  // Reset flag so we reload speeches when entering menu view again
   speechesAlreadyLoaded = false;
 
-  const urlParams = new URLSearchParams(window.location.search);
-const profileId = urlParams.get("id");
-const loggedInEmail = localStorage.getItem("speechdeb_email") || "";
+  getProfileAndLoadSpeeches();
 
-if (profileId) {
-  fetch(`user.php?action=get&id=${encodeURIComponent(profileId)}`)
-    .then(res => res.json())
-    .then(profile => {
-      const isOwner = (profile.email === loggedInEmail);
-      loadSpeechesFromServer(profile.email, isOwner);
-    })
-    .catch(err => {
-      console.error("⚠️ Failed to fetch profile:", err);
-      window.location.href = "404.html";
-    });
-} else {
-  loadSpeechesFromServer(loggedInEmail, true);
-}
-
-  // (optional) Hide filters until speeches are loaded
   const filtersBox = document.getElementById("filtersBox");
   if (filtersBox) {
     filtersBox.style.display = "none";
