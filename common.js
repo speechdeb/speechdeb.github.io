@@ -22,7 +22,7 @@
       <h2 style="font-size:17px; margin-bottom:10px;">We apologize for any inconvenience and will be back up soon. If you need access to your speeches immediately, please text 617-454-4303. Thank you.</h2>
       <br>
       <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;">
-        <p style="margin:0;">Staff password:</p>
+        <p style="margin:0;">Staff entry:</p>
         <input type="password" id="staffPasswordInput" placeholder="Staff password"
                style="padding:8px 12px; font-size:16px; border:1px solid #ccc; border-radius:6px; width:220px;" />
         <button id="staffPasswordSubmit" style="padding:8px 16px; font-size:16px; border-radius:6px; border:none; background:#007acc; color:white; cursor:pointer;">Enter</button>
