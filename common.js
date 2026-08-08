@@ -90,11 +90,11 @@ const APP_VERSION = "v1.02";
     <!-- ✅ VERSION BANNER -->
     <div id="versionBannerMenu">
       <div id="menuHeading">
-        <a style="color: white;" href="https://speechdeb.infy.uk/index.html">Speechdeb Editor <span id="menuVersion"></span></a>
+        <a style="color: white;" href="/index.html">Speechdeb Editor <span id="menuVersion"></span></a>
       </div>
       <br>
       <div id="subtitle">
-        <a style="color: #bbbbbb;" href="https://speechdeb.infy.uk/index.html">The first text editor for the National Speech & Debate Association!</a>
+        <a style="color: #bbbbbb;" href="/index.html">The first text editor for forensic competition!</a>
       </div>
     </div>
 
@@ -106,8 +106,8 @@ const APP_VERSION = "v1.02";
         <span id="userDropdownArrow">▼</span>
       </div>
       <div id="userMenuItems">
-        <div id="profile">Speeches</div>
-        <div id="prefs">Preferences</div>
+        <div id="profile">My Speeches</div>
+        <div id="prefs">Settings</div>
         <div id="resetPassword">Reset Password</div>
         <div id="deleteAccount">Delete Account</div>
         <div id="support">Support</div>
@@ -245,7 +245,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   } else if (currentUser) {
     // 🔹 Logged-in: wire up reset + delete
     if (reset) {
-      reset.onclick = () => window.location.href = "reset.html";
+      reset.onclick = () => window.location.href = "/reset.html";
     }
     if (del) {
       del.onclick = () => {
@@ -257,8 +257,8 @@ window.addEventListener("DOMContentLoaded", async () => {
   }
 
   // These are fine for both guest + logged-in
-  if (prefs)   prefs.onclick   = () => window.location.href = "https://speechdeb.infy.uk/settings.html";
-  if (support) support.onclick = () => window.location.href = "http://speechdeb.infy.uk/contact.html";
+  if (prefs)   prefs.onclick   = () => window.location.href = "/settings.html";
+  if (support) support.onclick = () => window.location.href = "/contact.html";
 
   // 🔹 Logout: real Supabase signOut + clear local guest flags
   async function logout() {
