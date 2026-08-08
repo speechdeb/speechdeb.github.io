@@ -138,7 +138,7 @@ const APP_VERSION = "v1.02";
     <hr>
       Speechdeb Editor <span id="footerVersion"></span> ® 2025-${CURRENT_YEAR} Speechdeb Software •
       <a href="contact.html">Contact Support</a> •
-      <a href="blog/blog.php">Blog</a> •
+      <a href="blog/blog.html">Blog</a> •
       <a href="https://linkedin.com/company/speechdeb">LinkedIn</a>
       <hr>
       <p>
@@ -343,6 +343,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     styleLink.href = "styles.css";
     document.head.appendChild(styleLink);
   }
+
+// Inject favicon if not already present
+if (!document.querySelector('link[rel="icon"]')) {
+  const faviconLink = document.createElement("link");
+  faviconLink.rel = "icon";
+  faviconLink.type = "image/png";
+  faviconLink.href = "/favicon.png";
+  document.head.appendChild(faviconLink);
+}
 
 // Inject script.js if not already present
 function loadScriptAndInit() {
