@@ -33,28 +33,36 @@ layout: none
       </p>
       <br>
 
-      {% assign post_paths = "" | split: "" %}
+      {% assign post_entries = "" | split: "" %}
 
 {% for f in site.static_files %}
   {% if f.path contains "/blog/20" and f.extname == ".html" %}
-    {% assign post_paths = post_paths | push: f.path %}
+    {% assign entry = f.path | append: "::" %}
+    {% assign post_entries = post_entries | push: entry %}
   {% endif %}
 {% endfor %}
 
 {% for p in site.html_pages %}
   {% assign pp = "/" | append: p.path %}
   {% if pp contains "/blog/20" %}
-    {% assign post_paths = post_paths | push: pp %}
+    {% assign entry = pp | append: "::" | append: p.title %}
+    {% assign post_entries = post_entries | push: entry %}
   {% endif %}
 {% endfor %}
 
-{% assign post_paths = post_paths | sort | reverse %}
+{% assign post_entries = post_entries | sort | reverse %}
 
-{% if post_paths.size > 0 %}
-  {% for path in post_paths %}
+{% if post_entries.size > 0 %}
+  {% for entry in post_entries %}
+    {% assign bits = entry | split: "::" %}
+    {% assign path = bits[0] %}
     {% assign parts = path | split: "/" %}
     {% assign post_date = parts[2] | append: "-" | append: parts[3] | append: "-" | append: parts[4] %}
-    {% assign post_title = parts[5] | remove: ".html" | replace: "-", " " | capitalize %}
+    {% if bits[1] and bits[1] != "" %}
+      {% assign post_title = bits[1] %}
+    {% else %}
+      {% assign post_title = parts[5] | remove: ".html" | replace: "-", " " | capitalize %}
+    {% endif %}
     <section>
       <h2>{{ post_date | date: "%-d %B %Y" }}</h2>
       <hr>
