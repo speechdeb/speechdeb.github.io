@@ -33,16 +33,38 @@ layout: none
       </p>
       <br>
 
-      {% if site.posts.size > 0 %}
-        {% assign latest = site.posts.first %}
-        <section>
-          <h2>{{ latest.date | date: "%-d %B %Y" }}</h2>
-          <hr>
-          <a href="{{ latest.url | relative_url }}">{{ latest.title }}</a>
-        </section>
-      {% else %}
-        <p><em>No posts found yet. Once a new post is written, it'll appear here.</em></p>
-      {% endif %}
+      {% assign post_paths = "" | split: "" %}
+
+{% for f in site.static_files %}
+  {% if f.path contains "/blog/20" and f.extname == ".html" %}
+    {% assign post_paths = post_paths | push: f.path %}
+  {% endif %}
+{% endfor %}
+
+{% for p in site.html_pages %}
+  {% assign pp = "/" | append: p.path %}
+  {% if pp contains "/blog/20" %}
+    {% assign post_paths = post_paths | push: pp %}
+  {% endif %}
+{% endfor %}
+
+{% assign post_paths = post_paths | sort | reverse %}
+
+{% if post_paths.size > 0 %}
+  {% for path in post_paths %}
+    {% assign parts = path | split: "/" %}
+    {% assign post_date = parts[2] | append: "-" | append: parts[3] | append: "-" | append: parts[4] %}
+    {% assign post_title = parts[5] | remove: ".html" | replace: "-", " " | capitalize %}
+    <section>
+      <h2>{{ post_date | date: "%-d %B %Y" }}</h2>
+      <hr>
+      <a href="{{ path | relative_url }}">{{ post_title }}</a>
+    </section>
+    <br>
+  {% endfor %}
+{% else %}
+  <p><em>No posts found yet. Once a new post is written, it'll appear here.</em></p>
+{% endif %}
 
     </div>
   </main>
