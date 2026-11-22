@@ -1,7 +1,5 @@
 // === Maintenance mode overlay ===
-// NOT real security — this is a client-side JS file in a public repo, so
-// the password is trivially visible to anyone who views source or opens
-// dev tools. This only deters casual visitors, nothing more.
+/*
 (function () {
   const STAFF_PASSWORD = "Speechdeb";
   const UNLOCK_KEY = "speechdeb_maintenance_unlocked";
@@ -56,6 +54,7 @@
     document.addEventListener("DOMContentLoaded", showMaintenanceOverlay);
   }
 })();
+*/
 
 const APP_VERSION = "v1.02";
   const CURRENT_YEAR = new Date().getFullYear();
